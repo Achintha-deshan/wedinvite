@@ -17,21 +17,27 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    console.log('[LOGIN] submit clicked, identifier:', identifier)
 
     const result = await signInAction({ identifier, password })
+    console.log('[LOGIN] signInAction result:', result)
 
     if (result.success) {
       const adminCheck = await checkAdminAction()
+      console.log('[LOGIN] checkAdminAction result:', adminCheck)
+
       if (adminCheck.isAdmin) {
-        router.push('/admin')
+        console.log('[LOGIN] isAdmin true, redirecting to /admin NOW')
+        window.location.href = '/admin'
       } else {
-        router.push('/dashboard')
+        console.log('[LOGIN] isAdmin false, redirecting to /dashboard NOW')
+        window.location.href = '/dashboard'
       }
-      router.refresh()
     } else {
+      console.log('[LOGIN] signIn failed:', result.error)
       setError(result.error ?? 'Login failed')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
