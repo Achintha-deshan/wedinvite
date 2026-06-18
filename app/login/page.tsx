@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signInAction } from '../actions/auth'
+import { checkAdminAction } from '../actions/admin'
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('')
@@ -20,7 +21,12 @@ export default function LoginPage() {
     const result = await signInAction({ identifier, password })
 
     if (result.success) {
-      router.push('/dashboard')
+      const adminCheck = await checkAdminAction()
+      if (adminCheck.isAdmin) {
+        router.push('/admin')
+      } else {
+        router.push('/dashboard')
+      }
       router.refresh()
     } else {
       setError(result.error ?? 'Login failed')
