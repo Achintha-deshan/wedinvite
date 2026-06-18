@@ -290,54 +290,80 @@ export default function Template1Preview() {
     )
   }
 
-  if (slide === 'story') {
-    return (
-      <div className="min-h-screen relative flex items-center justify-center overflow-hidden px-6">
-        <MusicPlayer />
+ // ===================== SLIDE: STORY (Improved) =====================
+if (slide === 'story') {
+  const storyBackgroundPhoto = togetherPhoto || '/assests/images/couple1.png'
 
-        {togetherPhoto ? (
-          <div className="absolute inset-0 z-0">
-            <img
-              src={togetherPhoto}
-              alt="Background"
-              className="w-full h-full object-cover transition-all duration-[1600ms]"
-              style={{ filter: storyRevealed ? 'blur(8px) brightness(0.65)' : 'blur(20px) brightness(0.45)', transform: storyRevealed ? 'scale(1.05)' : 'scale(1.15)' }}
-            />
-            <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, rgba(122,42,64,0.35), rgba(58,42,38,0.7))` }}></div>
-          </div>
-        ) : (
-          <div className="absolute inset-0 z-0" style={{ background: `linear-gradient(160deg, ${PINK_DEEP}, ${DARK})` }}></div>
-        )}
+  return (
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden px-6">
+      <MusicPlayer />
 
-        <div className={`relative z-10 text-center max-w-sm w-full transition-all duration-1000 ${storyRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <p className="text-xs tracking-[0.4em] uppercase mb-1" style={{ color: '#fff' }}>Our Journey</p>
-          <p className="text-[11px] mb-8" style={{ color: '#fff', opacity: 0.85 }}>අපගේ ආදරණීය කතාව</p>
-
-          <div className="rounded-3xl p-6" style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(6px)' }}>
-            <span className="text-2xl opacity-70" style={{ color: '#fff' }}>❝</span>
-            <p className="text-sm italic font-serif leading-relaxed mb-4 px-2" style={{ color: '#fff' }}>
-              "අනපේක්ෂිත ලෙස මුණගැසුණු අපි, අද ආදරයෙන් එකට බැඳී අපගේ සුන්දරම ජීවන ගමන ආරම්භ කරන්නට සූදානම්."
-            </p>
-            <span className="text-2xl opacity-70" style={{ color: '#fff' }}>❞</span>
-            <h1 className="font-serif text-2xl mt-4" style={{ color: '#fff' }}>{boyName} &amp; {girlName}</h1>
-          </div>
-
-          {editMode && (
-            <label
-              className="inline-flex items-center gap-2 mt-5 text-xs px-4 py-2 rounded-full cursor-pointer shadow-lg"
-              style={{ background: '#fff', color: PINK_DEEP }}
-            >
-              {uploadingKey === 'together_photo_url' ? 'Uploading...' : '✏️ Change background photo'}
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoChange(e, 'together_photo_url')} />
-            </label>
-          )}
-        </div>
+      {/* Background Section */}
+      <div className="absolute inset-0 z-0">
+        <img
+          src={storyBackgroundPhoto}
+          alt="Background"
+          className="w-full h-full object-cover transition-all duration-[1600ms]"
+          // Blur එක අඩු කර (පැහැදිලි බව වැඩි කිරීමට), brightness සහ scale පාලනය කර ඇත
+          style={{ 
+            filter: storyRevealed ? 'blur(4px) brightness(0.8)' : 'blur(10px) brightness(0.5)', 
+            transform: storyRevealed ? 'scale(1.02)' : 'scale(1.1)' 
+          }}
+        />
+        {/* වඩාත් අලංකාර Dark Overlay එකක් */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
       </div>
-    )
+
+      {/* Content Section */}
+      <div className={`relative z-10 text-center max-w-sm w-full transition-all duration-1000 ${storyRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <p className="text-[10px] tracking-[0.3em] uppercase mb-2 font-bold" style={{ color: '#ffd700' }}>OUR STORY</p>
+        
+        <div className="rounded-3xl p-8 border border-white/20 bg-white/10 backdrop-blur-md shadow-2xl">
+          {/* ඉංග්‍රීසි Caption එක */}
+          <p className="text-lg font-serif italic text-white leading-relaxed mb-6">
+            "Unexpectedly met, deeply in love, and now ready to begin our beautiful journey together."
+          </p>
+          
+          <div className="w-16 h-[1px] bg-white/50 mx-auto mb-6"></div>
+
+          <h1 className="font-serif text-3xl font-light tracking-wide" style={{ color: '#fff' }}>
+            {boyName} <span className="text-white/60">&</span> {girlName}
+          </h1>
+        </div>
+
+        {editMode && (
+          <label className="inline-flex items-center gap-2 mt-6 text-xs px-5 py-2.5 rounded-full cursor-pointer bg-white text-gray-800 hover:bg-gray-100 transition shadow-lg">
+            {uploadingKey === 'together_photo_url' ? 'Uploading...' : '✏️ Change Photo'}
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoChange(e, 'together_photo_url')} />
+          </label>
+        )}
+      </div>
+    </div>
+  )
+}
+ const getMapEmbedUrl = (url: string) => {
+    if (!url) return ''
+    // If it's already an embed URL, use as-is
+    if (url.includes('/maps/embed')) return url
+    // Try to extract coordinates from a standard Google Maps URL
+    const coordMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+    if (coordMatch) {
+      return `https://maps.google.com/maps?q=${coordMatch[1]},${coordMatch[2]}&z=15&output=embed`
+    }
+    // Try to extract a place query from /maps/place/ URLs
+    const placeMatch = url.match(/\/maps\/place\/([^/@]+)/)
+    if (placeMatch) {
+      return `https://maps.google.com/maps?q=${decodeURIComponent(placeMatch[1])}&z=15&output=embed`
+    }
+    // Fallback: treat the whole string as a search query (works for short share links pasted as text venue names)
+    return ''
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden" style={{ fontFamily: "'Playfair Display', serif" }}>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet" />
 
       {togetherPhoto ? (
         <div className="fixed inset-0 z-0">
@@ -345,7 +371,10 @@ export default function Template1Preview() {
           <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(251,243,238,0.55), rgba(251,243,238,0.92))', backdropFilter: 'blur(2px)' }}></div>
         </div>
       ) : (
-        <div className="fixed inset-0 z-0" style={{ background: CREAM }}></div>
+        <div className="fixed inset-0 z-0">
+          <img src="/assests/images/couple2.jpeg" alt="Background" className="w-full h-full object-cover" />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(251,243,238,0.6), rgba(251,243,238,0.93))', backdropFilter: 'blur(2px)' }}></div>
+        </div>
       )}
 
       <MusicPlayer />
@@ -358,41 +387,40 @@ export default function Template1Preview() {
               {togetherPhoto ? (
                 <img src={togetherPhoto} alt="Couple" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-1" style={{ background: 'rgba(224,114,138,0.08)' }}>
-                  <span className="text-2xl">📷</span>
-                  <span className="text-[10px]" style={{ color: PINK_DEEP }}>Add photo</span>
-                </div>
+                <img src="/assests/images/couple1.png" alt="Couple" className="w-full h-full object-cover" />
               )}
               {editMode && <EditBadge slotKey="together_photo_url" />}
             </div>
           </div>
         </div>
 
-        <div className="mb-10 animate-[fadeUp_0.8s_ease-out_0.1s_both]">
-          <h1 className="font-serif text-5xl mb-2 leading-tight" style={{ color: PINK_DEEP }}>
-            {boyName} <span className="text-3xl" style={{ color: PINK }}>&</span> {girlName}
+        <div className="mb-8 animate-[fadeUp_0.8s_ease-out_0.1s_both]">
+          <h1 className="text-5xl mb-2 leading-tight" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>
+            {boyName} <span className="text-3xl italic" style={{ color: PINK }}>&</span> {girlName}
           </h1>
           <p className="text-sm tracking-[0.3em] uppercase font-medium" style={{ color: GOLD }}>Getting Married</p>
           <p className="text-[11px] mt-1" style={{ color: GOLD, opacity: 0.8 }}>විවාහ වෙමින්</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 mb-8 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.2s_both]" style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
+        {/* Card: Parents */}
+        <div className="grid grid-cols-1 gap-4 mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.2s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
           <div>
             <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Son of</p>
             <p className="text-[10px] mb-1" style={{ color: GOLD, opacity: 0.75 }}>පුත්‍රයා</p>
-            <p className="font-serif text-sm" style={{ color: DARK }}>{boyFather} & {boyMother}</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{boyFather} & {boyMother}</p>
           </div>
-          <div className="text-lg" style={{ color: PINK }}>&</div>
+          <div className="text-lg italic" style={{ color: PINK }}>&</div>
           <div>
             <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Daughter of</p>
             <p className="text-[10px] mb-1" style={{ color: GOLD, opacity: 0.75 }}>දියණිය</p>
-            <p className="font-serif text-sm" style={{ color: DARK }}>{girlFather} & {girlMother}</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{girlFather} & {girlMother}</p>
           </div>
         </div>
 
-        <div className="mb-8 animate-[fadeUp_0.8s_ease-out_0.3s_both]">
-          <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Until we say "I Do"</p>
-          <div className="flex justify-center gap-3 mt-3">
+        {/* Card: Countdown */}
+        <div className="mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.3s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
+          <p className="text-[10px] uppercase tracking-[0.2em] mb-4" style={{ color: GOLD }}>Until we say "I Do"</p>
+          <div className="flex justify-center gap-3">
             {[
               { label: 'Days', value: countdown.days },
               { label: 'Hrs', value: countdown.hours },
@@ -400,17 +428,18 @@ export default function Template1Preview() {
               { label: 'Sec', value: countdown.seconds },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl w-16 py-4 shadow-lg" style={{ background: `linear-gradient(160deg, ${PINK}, ${PINK_DEEP})` }}>
-                <span className="block text-xl font-serif text-white">{item.value}</span>
+                <span className="block text-xl text-white" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>{item.value}</span>
                 <span className="block text-[8px] uppercase tracking-widest text-white opacity-80">{item.label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="space-y-5 mb-8 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.4s_both]" style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
+        {/* Card: Date & Schedule */}
+        <div className="space-y-5 mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.4s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
           <div>
             <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Wedding Date</p>
-            <p className="text-lg font-serif" style={{ color: DARK }}>{weddingDateText}</p>
+            <p className="text-lg italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{weddingDateText}</p>
           </div>
 
           <div className="h-px" style={{ background: `${PINK}30` }}></div>
@@ -438,12 +467,25 @@ export default function Template1Preview() {
               )}
             </div>
           </div>
+        </div>
 
-          <div className="h-px" style={{ background: `${PINK}30` }}></div>
-
-          <div>
+        {/* Card: Venue with embedded map */}
+        <div className="mb-6 rounded-3xl shadow-xl overflow-hidden animate-[fadeUp_0.8s_ease-out_0.45s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
+          {mapUrl && getMapEmbedUrl(mapUrl) ? (
+            <div className="w-full h-44">
+              <iframe
+                src={getMapEmbedUrl(mapUrl)}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                title="Venue location"
+              ></iframe>
+            </div>
+          ) : null}
+          <div className="p-6 text-left">
             <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Venue</p>
-            <p className="font-serif font-medium" style={{ color: DARK }}>{venueName}</p>
+            <p className="text-lg italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{venueName}</p>
             <p className="text-xs opacity-80" style={{ color: DARK }}>{venueAddress}</p>
             {mapUrl && (
               <button
@@ -458,7 +500,7 @@ export default function Template1Preview() {
         </div>
 
         {editMode && (
-          <div className="mb-8 p-5 rounded-3xl shadow-lg animate-[fadeUp_0.8s_ease-out_0.5s_both]" style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(10px)' }}>
+          <div className="mb-6 p-5 rounded-3xl shadow-lg animate-[fadeUp_0.8s_ease-out_0.5s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)' }}>
             <p className="text-[10px] uppercase tracking-[0.2em] mb-3" style={{ color: GOLD }}>🎵 Music</p>
             {musicInputOpen ? (
               <div className="flex gap-2">
@@ -481,13 +523,14 @@ export default function Template1Preview() {
         )}
 
         {notes && (
-          <div className="rounded-3xl p-5 mb-8 shadow-lg animate-[fadeUp_0.8s_ease-out_0.5s_both]" style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(10px)' }}>
+          <div className="rounded-3xl p-5 mb-6 shadow-lg animate-[fadeUp_0.8s_ease-out_0.5s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)' }}>
             <p className="text-[10px] uppercase tracking-[0.2em] mb-2" style={{ color: GOLD }}>Note</p>
             <p className="text-sm" style={{ color: DARK }}>{notes}</p>
           </div>
         )}
 
-        <div className="mb-4 animate-[fadeUp_0.8s_ease-out_0.6s_both]">
+        {/* Card: RSVP */}
+        <div className="mb-4 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.6s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
           <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Will you be attending?</p>
           <p className="text-[10px] mb-4 opacity-60" style={{ color: DARK }}>Preview only — guests will see this with their own name</p>
           <div className="flex gap-3 justify-center">
