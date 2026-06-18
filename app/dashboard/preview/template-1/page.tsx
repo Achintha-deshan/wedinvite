@@ -144,7 +144,7 @@ export default function Template1Preview() {
 
   const getYoutubeEmbedUrl = (url: string, autoplay: boolean) => {
     if (!url) return ''
-    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
     return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=${autoplay ? 1 : 0}&mute=0` : ''
   }
 

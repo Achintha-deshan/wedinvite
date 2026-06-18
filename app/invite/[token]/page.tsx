@@ -133,7 +133,7 @@ export default function GuestInvitePage() {
 
   const getYoutubeEmbedUrl = (url: string, autoplay: boolean) => {
     if (!url) return ''
-    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
     return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=${autoplay ? 1 : 0}&mute=0` : ''
   }
 
@@ -232,8 +232,8 @@ export default function GuestInvitePage() {
     ) : null
   )
 
-  const RsvpSection = () => (
-    <div className="mb-4 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.6s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
+const RsvpSection = () => (
+    <div className="mb-4 p-6 rounded-3xl shadow-xl" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
       <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Will you be attending?</p>
 
       {responded ? (
@@ -246,7 +246,7 @@ export default function GuestInvitePage() {
         >
           {responseStatus === 'confirmed' ? (
             <>
-              <p className="text-sm font-medium mb-1" style={{ color: '#3a8a3e' }}>{'\u2713'} You're confirmed!</p>
+              <p className="text-sm font-medium mb-1" style={{ color: '#3a8a3e' }}>✓ You're confirmed!</p>
               <p className="text-xs" style={{ color: '#3a8a3e', opacity: 0.8 }}>We can't wait to celebrate with you, {guestName}!</p>
             </>
           ) : (
@@ -261,6 +261,7 @@ export default function GuestInvitePage() {
           <p className="text-sm mb-3" style={{ color: DARK }}>How many will be attending?</p>
           <div className="flex items-center justify-center gap-3 mb-4">
             <button
+              type="button"
               onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
               className="w-8 h-8 rounded-full flex items-center justify-center"
               style={{ border: `1px solid ${PINK}`, color: PINK_DEEP }}
@@ -269,6 +270,7 @@ export default function GuestInvitePage() {
             </button>
             <span className="text-lg font-medium w-8" style={{ color: DARK }}>{guestCount}</span>
             <button
+              type="button"
               onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
               className="w-8 h-8 rounded-full flex items-center justify-center"
               style={{ border: `1px solid ${PINK}`, color: PINK_DEEP }}
@@ -277,6 +279,7 @@ export default function GuestInvitePage() {
             </button>
           </div>
           <button
+            type="button"
             onClick={handleConfirmAccept}
             disabled={submitting}
             className="w-full py-3 font-medium rounded-full text-sm disabled:opacity-50 shadow-md"
@@ -290,17 +293,19 @@ export default function GuestInvitePage() {
           <p className="text-[10px] mb-4 mt-2 opacity-60" style={{ color: DARK }}>Dear {guestName}, please let us know</p>
           <div className="flex gap-3 justify-center">
             <button
+              type="button"
               onClick={handleAccept}
               disabled={submitting}
-              className="px-8 py-3.5 rounded-2xl text-white font-bold text-sm shadow-xl transition-transform hover:scale-[1.02] disabled:opacity-50"
+              className="px-8 py-3.5 rounded-2xl text-white font-bold text-sm shadow-xl disabled:opacity-50"
               style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})` }}
             >
               Joyfully Accept
             </button>
             <button
+              type="button"
               onClick={handleDecline}
               disabled={submitting}
-              className="px-8 py-3.5 rounded-2xl text-sm font-medium border transition-all disabled:opacity-50"
+              className="px-8 py-3.5 rounded-2xl text-sm font-medium border disabled:opacity-50"
               style={{ borderColor: PINK, color: PINK_DEEP, background: 'rgba(255,255,255,0.6)' }}
             >
               {submitting ? '...' : 'Decline'}
@@ -393,13 +398,10 @@ export default function GuestInvitePage() {
           <img
             src={storyBackgroundPhoto}
             alt="Background"
-            className="w-full h-full object-cover transition-all duration-[1600ms]"
-            style={{
-              filter: storyRevealed ? 'blur(4px) brightness(0.8)' : 'blur(10px) brightness(0.5)',
-              transform: storyRevealed ? 'scale(1.02)' : 'scale(1.1)'
-            }}
+            className="w-full h-full object-cover"
+            style={{ filter: 'brightness(0.65)' }}
           />
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+          <div className="absolute inset-0 bg-black/30"></div>
         </div>
 
         <div className={`relative z-10 text-center max-w-sm w-full transition-all duration-1000 ${storyRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
