@@ -69,10 +69,6 @@ export default function GuestInvitePage() {
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [couple])
-
-  // Single source of truth for the music <video> element's play/pause state.
-  // Plays exactly once per tap: explicit ended-listener pauses it for certain,
-  // guarding against any re-trigger that could look like a "repeat."
   useEffect(() => {
     const audioEl = document.getElementById('wedding-music-player') as HTMLVideoElement | null
     if (!audioEl) return
@@ -88,7 +84,7 @@ export default function GuestInvitePage() {
       audioEl.loop = false
       audioEl.volume = 1
       audioEl.muted = false
-      audioEl.currentTime = 0
+      audioEl.currentTime = 2
       audioEl.play().catch(() => {
         audioEl.muted = true
         audioEl.play().then(() => {
@@ -561,7 +557,7 @@ export default function GuestInvitePage() {
                   )}
                   {receptionTime && (
                     <div className="flex items-center justify-between text-sm">
-                      <span style={{ color: PINK_DEEP }}>{'\u{1F942}'} Reception</span>
+                      <span style={{ color: PINK_DEEP }}>{'\u{1F942}'} Reception ends</span>
                       <span style={{ color: DARK }}>{formatTime(receptionTime)}</span>
                     </div>
                   )}
