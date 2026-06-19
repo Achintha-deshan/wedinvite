@@ -33,6 +33,7 @@ export default function GuestInvitePage() {
   const [responseStatus, setResponseStatus] = useState<'confirmed' | 'declined' | null>(null)
   const [guestCount, setGuestCount] = useState(1)
   const [showCountPicker, setShowCountPicker] = useState(false)
+  const [showDeclineConfirm, setShowDeclineConfirm] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -71,8 +72,8 @@ export default function GuestInvitePage() {
   }, [couple])
 
   // Single source of truth for the music <video> element's play/pause state.
-  // Plays exactly once per tap: explicit ended-listener pauses it for certain,
-  // guarding against any re-trigger that could look like a "repeat."
+  // Starts 2 seconds in to skip the silent intro. Plays naturally until it ends
+  // (no auto-stop timer), or until handleReplay explicitly stops it.
   useEffect(() => {
     const audioEl = document.getElementById('wedding-music-player') as HTMLVideoElement | null
     if (!audioEl) return
@@ -88,7 +89,7 @@ export default function GuestInvitePage() {
       audioEl.loop = false
       audioEl.volume = 1
       audioEl.muted = false
-      audioEl.currentTime = 0
+      audioEl.currentTime = 2
       audioEl.play().catch(() => {
         audioEl.muted = true
         audioEl.play().then(() => {
@@ -173,7 +174,10 @@ export default function GuestInvitePage() {
     }
   }
 
-  const handleDecline = async () => {
+  const handleDeclineClick = () => setShowDeclineConfirm(true)
+
+  const handleConfirmDecline = async () => {
+    setShowDeclineConfirm(false)
     setSubmitting(true)
     const res = await submitRsvpAction(token, 'declined', 0)
     setSubmitting(false)
@@ -265,6 +269,47 @@ export default function GuestInvitePage() {
     </div>
   )
 
+  const DeclineConfirmModal = () => (
+    !showDeclineConfirm ? null : (
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center px-6"
+        style={{ background: 'rgba(58,42,38,0.55)', backdropFilter: 'blur(4px)' }}
+      >
+        <div
+          className="max-w-sm w-full rounded-3xl p-7 text-center shadow-2xl animate-[fadeUp_0.3s_ease-out]"
+          style={{ background: CREAM, border: `1px solid ${PINK}40` }}
+        >
+          <div className="text-3xl mb-3">{'\u{1F622}'}</div>
+          <h2 className="text-xl italic mb-2" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>
+            Are you sure?
+          </h2>
+          <p className="text-sm mb-6" style={{ color: DARK, opacity: 0.75 }}>
+            We'd love to have you celebrate with us. Are you sure you want to decline?
+          </p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowDeclineConfirm(false)}
+              className="flex-1 py-3 rounded-2xl text-sm font-medium border"
+              style={{ borderColor: PINK, color: PINK_DEEP, background: '#fff' }}
+            >
+              Go Back
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDecline}
+              disabled={submitting}
+              className="flex-1 py-3 rounded-2xl text-sm font-medium text-white shadow-md disabled:opacity-50"
+              style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})` }}
+            >
+              {submitting ? '...' : 'Yes, Decline'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  )
+
   const RsvpSection = () => (
     <div className="mb-4 p-6 rounded-3xl shadow-xl" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
       <p className="text-sm mb-1" style={{ color: DARK }}>Dear {guestName},</p>
@@ -337,12 +382,12 @@ export default function GuestInvitePage() {
             </button>
             <button
               type="button"
-              onClick={handleDecline}
+              onClick={handleDeclineClick}
               disabled={submitting}
               className="px-8 py-3.5 rounded-2xl text-sm font-medium border disabled:opacity-50"
               style={{ borderColor: PINK, color: PINK_DEEP, background: 'rgba(255,255,255,0.6)' }}
             >
-              {submitting ? '...' : 'Regretfully Decline'}
+              Regretfully Decline
             </button>
           </div>
         </>
@@ -354,8 +399,7 @@ export default function GuestInvitePage() {
 
   return (
     <>
-      {/* Persistent music element - rendered exactly once, never unmounted across slide changes.
-          loop={false} explicit: plays once from tap, stops automatically, never restarts on its own. */}
+      {/* Persistent music element - rendered exactly once, never unmounted across slide changes. */}
       <video
         id="wedding-music-player"
         src="/assests/video/video1.mp4"
@@ -431,7 +475,7 @@ export default function GuestInvitePage() {
       {/* ===================== SLIDE: STORY ===================== */}
       {slide === 'story' && (
         <div className="min-h-screen relative flex items-center justify-center overflow-hidden px-6">
-         <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0">
             <img
               src={storyBackgroundPhoto}
               alt="Background"
@@ -607,6 +651,7 @@ export default function GuestInvitePage() {
             )}
 
             <RsvpSection />
+            <DeclineConfirmModal />
 
             <div className="mt-8">
               <p className="text-xs italic opacity-70" style={{ color: DARK }}>Thank you for being part of our journey.</p>
