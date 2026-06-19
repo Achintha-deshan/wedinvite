@@ -171,8 +171,8 @@ export default function GuestInvitePage() {
     )
   }
 
-  const boyName = couple?.boy_name || 'Denuwan'
-  const girlName = couple?.girl_name || 'Janani'
+  const boyName = couple?.boy_name || 'Sandaruwan'
+  const girlName = couple?.girl_name || 'Amalka'
   const venueName = couple?.venue_name || 'Galle Face Hotel'
   const venueAddress = couple?.venue_address || 'Colombo, Sri Lanka'
   const weddingDate = couple?.wedding_date || ''
@@ -221,20 +221,37 @@ export default function GuestInvitePage() {
     </div>
   )
 
-  const MusicPlayer = () => (
-    musicUrl && getYoutubeEmbedUrl(musicUrl, musicStarted) ? (
-      <iframe
-        src={getYoutubeEmbedUrl(musicUrl, musicStarted)}
-        title="Wedding music"
-        className="hidden"
-        allow="autoplay"
-      ></iframe>
-    ) : null
-  )
+const MusicPlayer = () => {
+    useEffect(() => {
+      if (!musicStarted) return
+      const audioEl = document.getElementById('wedding-music-player') as HTMLVideoElement | null
+      if (audioEl) {
+        audioEl.volume = 1
+        audioEl.muted = false
+        audioEl.play().catch(() => {
+          // If the browser still blocks it, retry muted then unmute on next tick
+          audioEl.muted = true
+          audioEl.play().then(() => {
+            setTimeout(() => { audioEl.muted = false }, 300)
+          }).catch(() => {})
+        })
+      }
+    }, [musicStarted])
 
-const RsvpSection = () => (
+    return (
+      <video
+        id="wedding-music-player"
+        src="/assests/video/video1.mp4"
+        style={{ position: 'fixed', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
+        loop
+        playsInline
+      />
+    )
+  }
+
+  const RsvpSection = () => (
     <div className="mb-4 p-6 rounded-3xl shadow-xl" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
-      <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Will you be attending?</p>
+      <p className="text-sm mb-1" style={{ color: DARK }}>Dear {guestName},</p>
 
       {responded ? (
         <div
@@ -246,7 +263,7 @@ const RsvpSection = () => (
         >
           {responseStatus === 'confirmed' ? (
             <>
-              <p className="text-sm font-medium mb-1" style={{ color: '#3a8a3e' }}>✓ You're confirmed!</p>
+              <p className="text-sm font-medium mb-1" style={{ color: '#3a8a3e' }}>{'\u2713'} You're confirmed!</p>
               <p className="text-xs" style={{ color: '#3a8a3e', opacity: 0.8 }}>We can't wait to celebrate with you, {guestName}!</p>
             </>
           ) : (
@@ -290,7 +307,8 @@ const RsvpSection = () => (
         </div>
       ) : (
         <>
-          <p className="text-[10px] mb-4 mt-2 opacity-60" style={{ color: DARK }}>Dear {guestName}, please let us know</p>
+          <p className="text-sm mb-1 mt-2" style={{ color: DARK }}>Your presence would mean so much to us.</p>
+          <p className="text-xs mb-4 opacity-70" style={{ color: DARK }}>Kindly let us know if you will be joining our celebration.</p>
           <div className="flex gap-3 justify-center">
             <button
               type="button"
@@ -308,7 +326,7 @@ const RsvpSection = () => (
               className="px-8 py-3.5 rounded-2xl text-sm font-medium border disabled:opacity-50"
               style={{ borderColor: PINK, color: PINK_DEEP, background: 'rgba(255,255,255,0.6)' }}
             >
-              {submitting ? '...' : 'Decline'}
+              {submitting ? '...' : 'Regretfully Decline'}
             </button>
           </div>
         </>
@@ -324,14 +342,13 @@ const RsvpSection = () => (
         <div className="relative z-10 text-center px-6 animate-[fadeIn_1.2s_ease-out]">
           <div className="mb-6 rounded-2xl py-3 px-5 shadow-lg" style={{ background: '#fff' }}>
             <p className="text-sm font-serif" style={{ color: PINK_DEEP }}>Dear {guestName},</p>
-            <p className="text-xs mt-1" style={{ color: GOLD }}>You are warmly invited</p>
+            <p className="text-xs mt-1" style={{ color: GOLD }}>We are warmly invite you to share in the celebration of our wedding day.</p>
           </div>
           <div className="text-xl mb-5" style={{ color: PINK_DEEP }}>{'\u2740 \u2740 \u2740'}</div>
-          <p className="text-xs tracking-[0.3em] uppercase mb-1" style={{ color: GOLD }}>The Wedding Of</p>
-          <p className="text-[11px] mb-4" style={{ color: GOLD, opacity: 0.8 }}>{'\u0dc0\u0dd2\u0dc0\u0dcf\u0dc4 \u0db8\u0d82\u0d9c\u0dbd\u0dca\u200d\u0dba\u0dba'}</p>
-          <h1 className="font-serif text-4xl mb-1" style={{ color: PINK_DEEP }}>{boyName}</h1>
-          <p className="text-xl font-serif italic my-1" style={{ color: PINK }}>&amp;</p>
-          <h1 className="font-serif text-4xl mb-10" style={{ color: PINK_DEEP }}>{girlName}</h1>
+          <p className="text-xs tracking-[0.3em] uppercase mb-4" style={{ color: GOLD }}>The Wedding Of</p>
+          <h1 className="text-4xl mb-1 italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>{boyName}</h1>
+          <p className="text-xl italic my-1" style={{ color: PINK, fontFamily: "'Playfair Display', serif" }}>&amp;</p>
+          <h1 className="text-4xl mb-10 italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>{girlName}</h1>
 
           <button onClick={handlePlay} className="group relative w-20 h-20 mx-auto mb-4 flex items-center justify-center" aria-label="Play invitation">
             <span className="absolute inset-0 rounded-full animate-ping" style={{ background: 'rgba(224,114,138,0.4)' }}></span>
@@ -339,7 +356,7 @@ const RsvpSection = () => (
               {'\u25B6'}
             </span>
           </button>
-          <p className="text-xs tracking-widest uppercase" style={{ color: PINK_DEEP }}>Tap to play invitation</p>
+          <p className="text-xs tracking-widest uppercase" style={{ color: PINK_DEEP }}>Tap to Open Our Invitation</p>
         </div>
         <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       </div>
@@ -354,7 +371,7 @@ const RsvpSection = () => (
         <Petals />
         <div className={`relative z-10 text-center max-w-sm w-full transition-all duration-1000 ${calendarRevealed ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
           <p className="text-xs tracking-[0.4em] uppercase mb-1" style={{ color: GOLD }}>Save the date</p>
-          <h1 className="font-serif text-3xl italic mb-1" style={{ color: PINK_DEEP }}>{boyName} &amp; {girlName}</h1>
+          <h1 className="text-3xl italic mb-1" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>{boyName} &amp; {girlName}</h1>
           <p className="text-xs tracking-[0.3em] uppercase mb-6" style={{ color: GOLD, opacity: 0.85 }}>{monthName}</p>
 
           <div className="rounded-2xl p-4 shadow-lg" style={{ background: '#fff', border: `1px solid ${PINK}50` }}>
@@ -380,7 +397,7 @@ const RsvpSection = () => (
             </div>
           </div>
 
-          <p className="font-serif italic text-sm mt-6" style={{ color: PINK_DEEP }}>Formal invitation to follow</p>
+          <p className="italic text-sm mt-6" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>We look forward to celebrating this special day with you</p>
         </div>
       </div>
     )
@@ -388,7 +405,7 @@ const RsvpSection = () => (
 
   // ===================== SLIDE: STORY =====================
   if (slide === 'story') {
-    const storyBackgroundPhoto = togetherPhoto || '/assests/images/couple1.png'
+    const storyBackgroundPhoto = togetherPhoto || '/assests/images/couple1.jpeg'
 
     return (
       <div className="min-h-screen relative flex items-center justify-center overflow-hidden px-6">
@@ -408,13 +425,13 @@ const RsvpSection = () => (
           <p className="text-[10px] tracking-[0.3em] uppercase mb-2 font-bold" style={{ color: '#ffd700' }}>OUR STORY</p>
 
           <div className="rounded-3xl p-8 border border-white/20 bg-white/10 backdrop-blur-md shadow-2xl">
-            <p className="text-lg font-serif italic text-white leading-relaxed mb-6">
-              "Unexpectedly met, deeply in love, and now ready to begin our beautiful journey together."
+            <p className="text-lg italic text-white leading-relaxed mb-6" style={{ fontFamily: "'Playfair Display', serif" }}>
+              "Unexpectedly met, deeply in love, and ready to begin our forever."
             </p>
 
             <div className="w-16 h-[1px] bg-white/50 mx-auto mb-6"></div>
 
-            <h1 className="font-serif text-3xl font-light tracking-wide" style={{ color: '#fff' }}>
+            <h1 className="text-3xl font-light tracking-wide" style={{ color: '#fff', fontFamily: "'Playfair Display', serif" }}>
               {boyName} <span className="text-white/60">&</span> {girlName}
             </h1>
           </div>
@@ -452,36 +469,42 @@ const RsvpSection = () => (
               {togetherPhoto ? (
                 <img src={togetherPhoto} alt="Couple" className="w-full h-full object-cover" />
               ) : (
-                <img src="/assests/images/couple1.png" alt="Couple" className="w-full h-full object-cover" />
+                <img src="/assests/images/couple1.jpeg" alt="Couple" className="w-full h-full object-cover" />
               )}
             </div>
           </div>
         </div>
 
         <div className="mb-8 animate-[fadeUp_0.8s_ease-out_0.1s_both]">
-          <h1 className="text-5xl mb-2 leading-tight" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>
+          <h1 className="text-5xl mb-2 leading-tight italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>
             {boyName} <span className="text-3xl italic" style={{ color: PINK }}>&</span> {girlName}
           </h1>
-          <p className="text-sm tracking-[0.3em] uppercase font-medium" style={{ color: GOLD }}>Getting Married</p>
-          <p className="text-[11px] mt-1" style={{ color: GOLD, opacity: 0.8 }}>{'\u0dc0\u0dd2\u0dc0\u0dcf\u0dc4 \u0dc0\u0dd9\u0db8\u0dd2\u0db1\u0dca'}</p>
+          <p className="text-sm mb-1" style={{ color: DARK, opacity: 0.8 }}>Together with their families,</p>
+          <p className="text-sm" style={{ color: DARK, opacity: 0.8 }}>request the pleasure of your company</p>
+          <p className="text-sm" style={{ color: DARK, opacity: 0.8 }}>as they celebrate their marriage.</p>
         </div>
 
         {/* Card: Parents */}
         <div className="grid grid-cols-1 gap-4 mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.2s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
           <div>
-            <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Son of</p>
-            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{boyFather} & {boyMother}</p>
+            <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Beloved Son of</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{boyFather}</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>&</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{boyMother}</p>
           </div>
           <div className="text-lg italic" style={{ color: PINK }}>&</div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Daughter of</p>
-            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{girlFather} & {girlMother}</p>
+            <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Beloved Daughter of</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{girlFather}</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>&</p>
+            <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{girlMother}</p>
           </div>
         </div>
 
         {/* Card: Countdown */}
         <div className="mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.3s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
-          <p className="text-[10px] uppercase tracking-[0.2em] mb-4" style={{ color: GOLD }}>Until we say "I Do"</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Until We Say "I Do"</p>
+          <p className="text-[10px] mb-4 opacity-70" style={{ color: DARK }}>Countdown to Our Special Day</p>
           <div className="flex justify-center gap-3">
             {[
               { label: 'Days', value: countdown.days },
@@ -500,7 +523,7 @@ const RsvpSection = () => (
         {/* Card: Date & Schedule */}
         <div className="space-y-5 mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.4s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Wedding Date</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Wedding Day</p>
             <p className="text-lg italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{weddingDateText}</p>
           </div>
 
@@ -511,25 +534,26 @@ const RsvpSection = () => (
             <div className="space-y-2">
               {ceremonyTime && (
                 <div className="flex items-center justify-between text-sm">
-                  <span style={{ color: PINK_DEEP }}>Ceremony</span>
+                  <span style={{ color: PINK_DEEP }}>{'\u{1F48D}'} Poruwa Ceremony</span>
                   <span style={{ color: DARK }}>{formatTime(ceremonyTime)}</span>
                 </div>
               )}
               {receptionTime && (
                 <div className="flex items-center justify-between text-sm">
-                  <span style={{ color: PINK_DEEP }}>Reception</span>
+                  <span style={{ color: PINK_DEEP }}>{'\u{1F942}'} Reception</span>
                   <span style={{ color: DARK }}>{formatTime(receptionTime)}</span>
                 </div>
               )}
-              {dinnerTime && (
+              {/* {dinnerTime && (
                 <div className="flex items-center justify-between text-sm">
                   <span style={{ color: PINK_DEEP }}>Dinner</span>
                   <span style={{ color: DARK }}>{formatTime(dinnerTime)}</span>
                 </div>
-              )}
+              )} */}
             </div>
           </div>
         </div>
+
 
         {/* Card: Venue with embedded map */}
         <div className="mb-6 rounded-3xl shadow-xl overflow-hidden animate-[fadeUp_0.8s_ease-out_0.45s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
@@ -570,7 +594,12 @@ const RsvpSection = () => (
 
         <RsvpSection />
 
-        <p className="mt-8 text-xs italic opacity-70" style={{ color: DARK }}>We look forward to celebrating with you.</p>
+        <div className="mt-8">
+          <p className="text-xs italic opacity-70" style={{ color: DARK }}>Thank you for being part of our journey.</p>
+          <p className="text-sm italic mt-3" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>With Love,</p>
+          <p className="text-lg italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>{boyName} &amp; {girlName}</p>
+          <p className="text-xs mt-3" style={{ color: GOLD }}>{'\u2764'} Forever Begins Here {'\u2764'}</p>
+        </div>
 
         <button onClick={handleReplay} className="mt-6 text-[10px] underline opacity-60" style={{ color: PINK_DEEP }}>
           Replay invitation
