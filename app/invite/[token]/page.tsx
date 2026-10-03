@@ -1,676 +1,973 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { getInvitationByTokenAction, submitRsvpAction } from '../../actions/guests'
 
-const PINK = '#E0728A'
-const PINK_DARK = '#9C3F58'
-const PINK_DEEP = '#7A2A40'
-const CREAM = '#FBF3EE'
-const GOLD = '#C99A4B'
-const DARK = '#3A2A26'
+// ── Sage/Emerald/Gold palette (customer requirement) ──────────────────────────
+const OL       = '#7A9E7E'   // sage green — mid tone
+const OL_DARK  = '#2D6A4F'   // emerald green — deep
+const OL_DEEP  = '#1B3A2D'   // forest dark — bg
+const GOLD     = '#C8A96E'   // warm gold
+const CREAM    = '#F5F8F2'   // green-tinted cream white
+const DARK     = '#162820'   // near-black green
 
-type SlideName = 'cover' | 'calendar' | 'story' | 'details'
+type Slide = 'cover' | 'story' | 'details'
 
 export default function GuestInvitePage() {
   const params = useParams()
-  const token = params.token as string
+  const token  = params.token as string
 
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-  const [guest, setGuest] = useState<any>(null)
-  const [couple, setCouple] = useState<any>(null)
+  const [loading,     setLoading]     = useState(true)
+  const [notFound,    setNotFound]    = useState(false)
+  const [guest,       setGuest]       = useState<any>(null)
+  const [couple,      setCouple]      = useState<any>(null)
+  const [slide,       setSlide]       = useState<Slide>('cover')
+  const [animDone,    setAnimDone]    = useState(false)   // silhouette animation finished
+  const [playing,     setPlaying]     = useState(false)
+  const [musicOn,     setMusicOn]     = useState(false)
+  const [countdown,   setCountdown]   = useState({ days:0, hours:0, minutes:0, seconds:0 })
+  const [submitting,  setSubmitting]  = useState(false)
+  const [responded,   setResponded]   = useState(false)
+  const [rsvpStatus,  setRsvpStatus]  = useState<'confirmed'|'declined'|null>(null)
+  const [guestCount,  setGuestCount]  = useState(1)
+  const [showPicker,  setShowPicker]  = useState(false)
+  const [showDecline, setShowDecline] = useState(false)
 
-  const [slide, setSlide] = useState<SlideName>('cover')
-  const [calendarRevealed, setCalendarRevealed] = useState(false)
-  const [storyRevealed, setStoryRevealed] = useState(false)
-  const [musicStarted, setMusicStarted] = useState(false)
-  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+  // story photo index for manual swipe/tap
+  const [photoIdx, setPhotoIdx] = useState(0)
+  const touchStartX = useRef<number>(0)
 
-  const [submitting, setSubmitting] = useState(false)
-  const [responded, setResponded] = useState(false)
-  const [responseStatus, setResponseStatus] = useState<'confirmed' | 'declined' | null>(null)
-  const [guestCount, setGuestCount] = useState(1)
-  const [showCountPicker, setShowCountPicker] = useState(false)
-  const [showDeclineConfirm, setShowDeclineConfirm] = useState(false)
-
+  // ── Load ───────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const load = async () => {
-      const res = await getInvitationByTokenAction(token)
+    getInvitationByTokenAction(token).then(res => {
       if (res.success) {
         setGuest(res.guest)
         setCouple(res.couple)
         if (res.guest.rsvp_status === 'confirmed' || res.guest.rsvp_status === 'declined') {
           setResponded(true)
-          setResponseStatus(res.guest.rsvp_status)
+          setRsvpStatus(res.guest.rsvp_status)
         }
-      } else {
-        setNotFound(true)
-      }
+      } else { setNotFound(true) }
       setLoading(false)
-    }
-    load()
+    })
   }, [token])
 
+  // ── Countdown ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!couple?.wedding_date) return
     const target = new Date(couple.wedding_date).getTime()
     const tick = () => {
-      const now = Date.now()
-      const diff = Math.max(0, target - now)
+      const diff = Math.max(0, target - Date.now())
       setCountdown({
-        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((diff / (1000 * 60)) % 60),
+        days:    Math.floor(diff / 86400000),
+        hours:   Math.floor((diff / 3600000) % 24),
+        minutes: Math.floor((diff / 60000) % 60),
         seconds: Math.floor((diff / 1000) % 60),
       })
     }
     tick()
-    const interval = setInterval(tick, 1000)
-    return () => clearInterval(interval)
+    const iv = setInterval(tick, 1000)
+    return () => clearInterval(iv)
   }, [couple])
 
-  // Single source of truth for the music <video> element's play/pause state.
-  // Starts 2 seconds in to skip the silent intro. Plays naturally until it ends
-  // (no auto-stop timer), or until handleReplay explicitly stops it.
+  // ── Music ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const audioEl = document.getElementById('wedding-music-player') as HTMLVideoElement | null
-    if (!audioEl) return
-
-    const stopForGood = () => {
-      audioEl.pause()
-      audioEl.currentTime = 0
-    }
-
-    audioEl.addEventListener('ended', stopForGood)
-
-    if (musicStarted) {
-      audioEl.loop = false
-      audioEl.volume = 1
-      audioEl.muted = false
-      audioEl.currentTime = 2
-      audioEl.play().catch(() => {
-        audioEl.muted = true
-        audioEl.play().then(() => {
-          setTimeout(() => { audioEl.muted = false }, 300)
-        }).catch(() => {})
+    const el = document.getElementById('wedding-music') as HTMLVideoElement | null
+    if (!el) return
+    if (musicOn) {
+      el.loop = false; el.currentTime = 2; el.muted = false
+      el.play().catch(() => {
+        el.muted = true
+        el.play().then(() => setTimeout(() => { el.muted = false }, 300)).catch(() => {})
       })
-    } else {
-      stopForGood()
-    }
+    } else { el.pause(); el.currentTime = 0 }
+  }, [musicOn])
 
-    return () => {
-      audioEl.removeEventListener('ended', stopForGood)
-    }
-  }, [musicStarted])
-
-  // Preload the details-slide images as soon as the invitation starts playing,
-  // so they're already cached by the time the user reaches that slide ~6.8s later.
-  useEffect(() => {
-    if (!musicStarted) return
-    const togetherUrl = couple?.together_photo_url || ''
-    const urls = [
-      togetherUrl || '/assests/images/couple1.jpeg',
-      togetherUrl || '/assests/images/couple2.jpeg',
-    ]
-    urls.forEach((url) => {
-      const img = new Image()
-      img.src = url
-    })
-  }, [musicStarted, couple])
-
+  // ── Tap to play → run animation → show invitation ─────────────────────────
   const handlePlay = () => {
-    setMusicStarted(true)
-    setSlide('calendar')
-    setTimeout(() => setCalendarRevealed(true), 200)
-    setTimeout(() => {
-      setSlide('story')
-      setTimeout(() => setStoryRevealed(true), 100)
-    }, 3800)
-    setTimeout(() => setSlide('details'), 6800)
-    // No auto-stop timer: music plays naturally until it ends,
-    // or until the user clicks "Replay invitation".
+    setPlaying(true)
+    setMusicOn(true)
+    setAnimDone(true)
+    // hearts burst for 1s, then auto-advance to story
+    setTimeout(() => setSlide('story'), 1200)
   }
 
-  const handleReplay = () => {
-    setMusicStarted(false)
-    setSlide('cover')
-    setCalendarRevealed(false)
-    setStoryRevealed(false)
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const fmt12 = (t: string) => {
+    if (!t) return ''
+    const [h, m] = t.split(':').map(Number)
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`
   }
-
-  const formatTime = (time: string) => {
-    if (!time) return ''
-    const parts = time.split(':')
-    const h = parts[0]
-    const m = parts[1]
-    const hour = parseInt(h)
-    const displayHour = hour > 12 ? hour - 12 : hour
-    const ampm = hour >= 12 ? 'PM' : 'AM'
-    return displayHour + ':' + m + ' ' + ampm
-  }
-
-  const formatDate = (date: string) => {
-    if (!date) return ''
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
-
-  const handleAccept = () => setShowCountPicker(true)
-
-  const handleConfirmAccept = async () => {
-    setSubmitting(true)
-    const res = await submitRsvpAction(token, 'confirmed', guestCount)
-    setSubmitting(false)
-    if (res.success) {
-      setResponded(true)
-      setResponseStatus('confirmed')
-      setShowCountPicker(false)
-    }
-  }
-
-  const handleDeclineClick = () => setShowDeclineConfirm(true)
-
-  const handleConfirmDecline = async () => {
-    setShowDeclineConfirm(false)
-    setSubmitting(true)
-    const res = await submitRsvpAction(token, 'declined', 0)
-    setSubmitting(false)
-    if (res.success) {
-      setResponded(true)
-      setResponseStatus('declined')
-    }
-  }
-
-  const getMapEmbedUrl = (url: string) => {
+  const getMapEmbed = (url: string) => {
     if (!url) return ''
     if (url.includes('/maps/embed')) return url
-    const coordMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
-    if (coordMatch) {
-      return `https://maps.google.com/maps?q=${coordMatch[1]},${coordMatch[2]}&z=15&output=embed`
-    }
-    const placeMatch = url.match(/\/maps\/place\/([^/@]+)/)
-    if (placeMatch) {
-      return `https://maps.google.com/maps?q=${decodeURIComponent(placeMatch[1])}&z=15&output=embed`
-    }
+    const coord = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+    if (coord) return `https://maps.google.com/maps?q=${coord[1]},${coord[2]}&z=15&output=embed`
+    const place = url.match(/\/maps\/place\/([^/@]+)/)
+    if (place) return `https://maps.google.com/maps?q=${decodeURIComponent(place[1])}&z=15&output=embed`
     return ''
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: CREAM }}>
-        <div className="text-2xl animate-pulse" style={{ color: PINK_DARK }}>{'\u2665'}</div>
-      </div>
-    )
-  }
-
-  if (notFound) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-center px-6" style={{ background: CREAM }}>
-        <div>
-          <div className="text-4xl mb-4">{'\u{1F614}'}</div>
-          <h1 className="font-serif text-xl mb-2" style={{ color: PINK_DARK }}>Invitation not found</h1>
-          <p className="text-sm" style={{ color: GOLD }}>This link may be invalid or expired.</p>
-        </div>
-      </div>
-    )
-  }
-
-  const boyName = couple?.boy_name || 'Sandaruwan'
-  const girlName = couple?.girl_name || 'Amalka'
-  const venueName = couple?.venue_name || 'Galle Face Hotel'
-  const venueAddress = couple?.venue_address || 'Colombo, Sri Lanka'
-  const weddingDate = couple?.wedding_date || ''
-  const weddingDateText = weddingDate ? formatDate(weddingDate) : 'Saturday, August 14, 2026'
-  const boyFather = couple?.boy_father_name || 'Mr. Perera'
-  const boyMother = couple?.boy_mother_name || 'Mrs. Perera'
-  const girlFather = couple?.girl_father_name || 'Mr. Silva'
-  const girlMother = couple?.girl_mother_name || 'Mrs. Silva'
-  const mapUrl = couple?.map_url || ''
-  const togetherPhoto = couple?.together_photo_url || ''
-  const ceremonyTime = couple?.ceremony_time || ''
+  // ── Derived data (no fake fallback names) ─────────────────────────────────
+  const boyName       = couple?.boy_name       || ''
+  const girlName      = couple?.girl_name      || ''
+  const boyFather     = couple?.boy_father_name  || ''
+  const boyMother     = couple?.boy_mother_name  || ''
+  const girlFather    = couple?.girl_father_name || ''
+  const girlMother    = couple?.girl_mother_name || ''
+  const venueName     = couple?.venue_name     || ''
+  const venueAddress  = couple?.venue_address  || ''
+  const mapUrl        = couple?.map_url        || ''
+const togetherPhoto = couple?.together_photo_url || '/assests/images/together.jpeg'
+  const storyPhoto    = couple?.story_photo_url    || togetherPhoto
+  const boyPhoto      = couple?.boy_photo_url      || ''
+  const girlPhoto     = couple?.girl_photo_url     || ''
+  const ceremonyTime  = couple?.ceremony_time  || ''
   const receptionTime = couple?.reception_time || ''
-  const notes = couple?.additional_notes || ''
-  const guestName = guest?.name || 'Guest'
+  const notes         = couple?.additional_notes || ''
+  const guestName     = guest?.name || ''
 
-  const dObj = weddingDate ? new Date(weddingDate) : new Date(2026, 7, 14)
-  const year = dObj.getFullYear()
-  const month = dObj.getMonth()
-  const weddingDay = dObj.getDate()
-  const monthName = dObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  const firstDayOfWeek = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const calendarCells: (number | null)[] = []
-  for (let i = 0; i < firstDayOfWeek; i++) calendarCells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d)
+  // Story photos — up to 4 from Supabase, fallback to placeholder slots
+  const storyPhotos = [togetherPhoto, storyPhoto, boyPhoto, girlPhoto].filter(Boolean)
 
-  const Petals = () => (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {Array.from({ length: 14 }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute text-sm"
-          style={{
-            top: `${Math.random() * 90}%`,
-            left: `${Math.random() * 95}%`,
-            opacity: 0.4 + Math.random() * 0.4,
-            transform: `rotate(${Math.random() * 360}deg)`,
-            color: PINK,
-          }}
-        >
-          {'\u2740'}
-        </div>
-      ))}
+  const wDate           = couple?.wedding_date ? new Date(couple.wedding_date) : null
+  const weddingDateText = wDate
+    ? wDate.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })
+    : ''
+  const weddingDay  = wDate?.getDate() || 0
+  const monthName   = wDate?.toLocaleDateString('en-US', { month:'long', year:'numeric' }) || ''
+
+  // Calendar grid
+  const calCells: (number|null)[] = []
+  if (wDate) {
+    const y = wDate.getFullYear(), m = wDate.getMonth()
+    const first = new Date(y, m, 1).getDay()
+    const days  = new Date(y, m+1, 0).getDate()
+    for (let i = 0; i < first; i++) calCells.push(null)
+    for (let d = 1; d <= days; d++) calCells.push(d)
+  }
+
+  // ── Early returns ──────────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background: OL_DEEP }}>
+      <div style={{ width:40, height:40, border:`3px solid ${GOLD}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform:rotate(360deg) } }`}</style>
     </div>
   )
 
-  const DeclineConfirmModal = () => (
-    !showDeclineConfirm ? null : (
-      <div
-        className="fixed inset-0 z-[100] flex items-center justify-center px-6"
-        style={{ background: 'rgba(58,42,38,0.55)', backdropFilter: 'blur(4px)' }}
-      >
-        <div
-          className="max-w-sm w-full rounded-3xl p-7 text-center shadow-2xl animate-[fadeUp_0.3s_ease-out]"
-          style={{ background: CREAM, border: `1px solid ${PINK}40` }}
-        >
-          <div className="text-3xl mb-3">{'\u{1F622}'}</div>
-          <h2 className="text-xl italic mb-2" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>
-            Are you sure?
-          </h2>
-          <p className="text-sm mb-6" style={{ color: DARK, opacity: 0.75 }}>
-            We'd love to have you celebrate with us. Are you sure you want to decline?
-          </p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setShowDeclineConfirm(false)}
-              className="flex-1 py-3 rounded-2xl text-sm font-medium border"
-              style={{ borderColor: PINK, color: PINK_DEEP, background: '#fff' }}
-            >
-              Go Back
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDecline}
-              disabled={submitting}
-              className="flex-1 py-3 rounded-2xl text-sm font-medium text-white shadow-md disabled:opacity-50"
-              style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})` }}
-            >
-              {submitting ? '...' : 'Yes, Decline'}
-            </button>
-          </div>
-        </div>
+  if (notFound) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background: OL_DEEP, textAlign:'center', padding:24 }}>
+      <div>
+        <div style={{ fontSize:48, marginBottom:16 }}>🍃</div>
+        <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:22, fontStyle:'italic', marginBottom:8 }}>Invitation not found</h1>
+        <p style={{ color: GOLD, fontSize:13 }}>This link may be invalid or expired.</p>
       </div>
-    )
+    </div>
   )
 
-  const RsvpSection = () => (
-    <div className="mb-4 p-6 rounded-3xl shadow-xl" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
-      <p className="text-sm mb-1" style={{ color: DARK }}>Dear {guestName},</p>
+  // ══════════════════════════════════════════════════════════════════════════
+  //  COVER SLIDE — Romantic sage/emerald/gold, leaf petals, elegant names
+  // ══════════════════════════════════════════════════════════════════════════
+  if (slide === 'cover') return (
+    <>
+      <video id="wedding-music" src="/assests/video/video1.mp4" playsInline
+        style={{ position:'fixed', width:1, height:1, opacity:0, pointerEvents:'none' }} />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet" />
 
-      {responded ? (
-        <div
-          className="rounded-2xl p-5 mt-3"
-          style={{
-            background: responseStatus === 'confirmed' ? 'rgba(76,175,80,0.1)' : 'rgba(220,80,80,0.1)',
-            border: `1px solid ${responseStatus === 'confirmed' ? 'rgba(76,175,80,0.4)' : 'rgba(220,80,80,0.4)'}`,
-          }}
-        >
-          {responseStatus === 'confirmed' ? (
-            <>
-              <p className="text-sm font-medium mb-1" style={{ color: '#3a8a3e' }}>{'\u2713'} You're confirmed!</p>
-              <p className="text-xs" style={{ color: '#3a8a3e', opacity: 0.8 }}>We can't wait to celebrate with you, {guestName}!</p>
-            </>
-          ) : (
-            <>
-              <p className="text-sm font-medium mb-1" style={{ color: '#b94545' }}>Thanks for letting us know</p>
-              <p className="text-xs" style={{ color: '#b94545', opacity: 0.8 }}>We'll miss you, {guestName}. Sending our love!</p>
-            </>
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        @keyframes petalFall {
+          0%   { transform: translateY(-10px) rotate(0deg) translateX(0px); opacity: 0; }
+          10%  { opacity: 0.8; }
+          85%  { opacity: 0.5; }
+          100% { transform: translateY(105vh) rotate(540deg) translateX(30px); opacity: 0; }
+        }
+        @keyframes petalSway {
+          0%,100% { margin-left: 0px; }
+          33%      { margin-left: 18px; }
+          66%      { margin-left: -12px; }
+        }
+        @keyframes nameReveal {
+          0%   { opacity: 0; letter-spacing: 0.4em; }
+          100% { opacity: 1; letter-spacing: 0.08em; }
+        }
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(22px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes ringGlow {
+          0%,100% { box-shadow: 0 0 0 0 rgba(200,169,110,0.4); }
+          50%      { box-shadow: 0 0 0 14px rgba(200,169,110,0); }
+        }
+        @keyframes heartPop {
+          0%   { transform: scale(0) rotate(-15deg); opacity: 0; }
+          60%  { transform: scale(1.2) rotate(5deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes heartFloat {
+          0%   { transform: translateY(0) scale(1); opacity: 0.9; }
+          100% { transform: translateY(-70px) scale(0.4); opacity: 0; }
+        }
+        @keyframes shimmer {
+          0%,100% { opacity: 0.5; }
+          50%      { opacity: 1; }
+        }
+        @keyframes tapBounce {
+          0%,100% { transform: translateY(0); }
+          50%      { transform: translateY(-5px); }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .petal-wrap { animation: petalSway 4s ease-in-out infinite; }
+
+        .name-boy  { animation: nameReveal 1.4s cubic-bezier(0.16,1,0.3,1) 0.3s both; }
+        .name-amp  { animation: fadeSlideUp 0.8s ease-out 1.2s both; }
+        .name-girl { animation: nameReveal 1.4s cubic-bezier(0.16,1,0.3,1) 1.5s both; }
+        .caption   { animation: fadeSlideUp 0.9s ease-out 2.4s both; }
+        .cta-btn   { animation: fadeSlideUp 0.9s ease-out 2.9s both; }
+        .tap-hint  { animation: tapBounce 2s ease-in-out infinite; }
+
+        .ring-icon { animation: ringGlow 2.5s ease-in-out infinite; }
+        .shimmer-line { animation: shimmer 3s ease-in-out infinite; }
+      `}</style>
+
+      <div style={{
+        minHeight: '100dvh', position: 'relative', overflow: 'hidden',
+        background: 'linear-gradient(160deg, #f2f7f0 0%, #edf5ea 40%, #f5f8f2 70%, #f0f6ed 100%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        fontFamily: "'Cormorant Garamond', serif",
+      }}>
+
+        {/* ── Falling rose petals ── */}
+        {[
+          { left:'5%',  dur:'7s',  delay:'0s',   size:18, opacity:0.4, color:'#7A9E7E' },
+          { left:'14%', dur:'9.5s',delay:'1.2s', size:14, opacity:0.35, color:'#9CAF88' },
+          { left:'24%', dur:'6.8s',delay:'2.4s', size:20, opacity:0.38, color:'#5A8A5E' },
+          { left:'34%', dur:'11s', delay:'0.6s', size:12, opacity:0.3,  color:'#C8A96E' },
+          { left:'46%', dur:'8.2s',delay:'3s',   size:16, opacity:0.38, color:'#7A9E7E' },
+          { left:'57%', dur:'7.5s',delay:'1.8s', size:22, opacity:0.35, color:'#9CAF88' },
+          { left:'67%', dur:'10s', delay:'0.9s', size:13, opacity:0.42, color:'#5A8A5E' },
+          { left:'76%', dur:'6.5s',delay:'2.8s', size:17, opacity:0.3,  color:'#C8A96E' },
+          { left:'85%', dur:'9s',  delay:'1.5s', size:15, opacity:0.38, color:'#7A9E7E' },
+          { left:'93%', dur:'7.8s',delay:'3.5s', size:11, opacity:0.35, color:'#9CAF88' },
+          { left:'20%', dur:'12s', delay:'5s',   size:10, opacity:0.28, color:'#5A8A5E' },
+          { left:'72%', dur:'8.8s',delay:'4.2s', size:19, opacity:0.38, color:'#C8A96E' },
+        ].map((p, i) => (
+          <div key={i} style={{
+            position:'absolute', top:0, left:p.left, pointerEvents:'none', zIndex:1,
+            animation: `petalFall ${p.dur} ease-in ${p.delay} infinite`,
+          }}>
+            <div className="petal-wrap">
+              <svg width={p.size} height={p.size * 1.4} viewBox="0 0 24 34" fill={p.color} opacity={p.opacity}>
+                {/* leaf shape */}
+                <path d="M12 2 Q20 10 12 32 Q4 10 12 2Z"/>
+                <path d="M12 2 Q12 18 12 32" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" fill="none"/>
+              </svg>
+            </div>
+          </div>
+        ))}
+
+        {/* ── Top ornament ── */}
+        <div style={{ position:'relative', zIndex:10, textAlign:'center', paddingTop:52, width:'100%' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:6 }}>
+            <div style={{ width:48, height:1, background:'linear-gradient(to right,transparent,#C8A96E)', opacity:0.5 }} className="shimmer-line" />
+            <span style={{ color:'#C8A96E', fontSize:11, letterSpacing:'0.4em', opacity:0.75 }}>✦</span>
+            <div style={{ width:48, height:1, background:'linear-gradient(to left,transparent,#C8A96E)', opacity:0.5 }} className="shimmer-line" />
+          </div>
+          {guestName && (
+            <p style={{ color:'#9B7A5A', fontSize:13, fontStyle:'italic', letterSpacing:'0.04em', marginBottom:2, opacity:0.9 }}>
+              Dear {guestName},
+            </p>
           )}
+          <p style={{ color:'#C8A96E', fontSize:9, letterSpacing:'0.5em', textTransform:'uppercase', opacity:0.65 }}>
+            You are warmly invited to the wedding of
+          </p>
         </div>
-      ) : showCountPicker ? (
-        <div className="mt-3">
-          <p className="text-sm mb-3" style={{ color: DARK }}>How many will be attending?</p>
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <button
-              type="button"
-              onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
-              className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ border: `1px solid ${PINK}`, color: PINK_DEEP }}
-            >
-              -
-            </button>
-            <span className="text-lg font-medium w-8" style={{ color: DARK }}>{guestCount}</span>
-            <button
-              type="button"
-              onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
-              className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ border: `1px solid ${PINK}`, color: PINK_DEEP }}
-            >
-              +
-            </button>
+
+        {/* ── Ring / heart emblem ── */}
+        <div style={{ position:'relative', zIndex:10, margin:'22px 0 18px', display:'flex', flexDirection:'column', alignItems:'center', gap:0 }}>
+          <div className="ring-icon" style={{
+            width:72, height:72, borderRadius:'50%',
+            border:'2px solid #C8A96E',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            background:'rgba(255,255,255,0.7)', backdropFilter:'blur(8px)',
+          }}>
+            {playing && animDone ? (
+              <>
+                <span style={{ fontSize:28, animation:'heartPop 0.5s ease-out both' }}>♥</span>
+                {[
+                  { top:'-22px', left:'50%', s:16, delay:'0.1s' },
+                  { top:'-14px', left:'20%', s:11, delay:'0.25s' },
+                  { top:'-14px', left:'80%', s:10, delay:'0.35s' },
+                  { top:'-30px', left:'60%', s:13, delay:'0.15s' },
+                  { top:'-28px', left:'35%', s:9,  delay:'0.4s' },
+                ].map((h,i) => (
+                  <span key={i} style={{
+                    position:'absolute', top:h.top, left:h.left,
+                    fontSize:h.s, color:'#E8536A',
+                    animation:`heartFloat 1.2s ease-out ${h.delay} both`,
+                    transform:'translateX(-50%)',
+                    pointerEvents:'none',
+                  }}>♥</span>
+                ))}
+              </>
+            ) : (
+              <span style={{ fontSize:26, color:'#C8A96E', opacity:0.85 }}>💍</span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Names ── */}
+        <div style={{ position:'relative', zIndex:10, textAlign:'center', width:'100%', padding:'0 32px' }}>
+          {boyName && (
+            <h1 className="name-boy" style={{
+              fontFamily:"'Playfair Display', serif",
+              fontSize: 'clamp(36px, 10vw, 52px)',
+              fontWeight:400, fontStyle:'italic',
+              color:'#2C2218', lineHeight:1.1,
+            }}>{boyName}</h1>
+          )}
+          <p className="name-amp" style={{
+            fontFamily:"'Cormorant Garamond', serif",
+            fontSize:22, color:'#C8A96E', margin:'6px 0', fontStyle:'italic', opacity:0.9,
+          }}>&amp;</p>
+          {girlName && (
+            <h1 className="name-girl" style={{
+              fontFamily:"'Playfair Display', serif",
+              fontSize: 'clamp(36px, 10vw, 52px)',
+              fontWeight:400, fontStyle:'italic',
+              color:'#2C2218', lineHeight:1.1,
+            }}>{girlName}</h1>
+          )}
+          {/* blush underline */}
+          <div style={{
+            width:80, height:2, borderRadius:2,
+            background:'linear-gradient(to right,#7A9E7E,#C8A96E,#7A9E7E)',
+            margin:'14px auto 0', opacity:0.7,
+          }} />
+        </div>
+
+        {/* ── Date ── */}
+        {weddingDateText && (
+          <div className="caption" style={{ position:'relative', zIndex:10, textAlign:'center', marginTop:16, padding:'0 32px' }}>
+            <p style={{ color:'#9B7A5A', fontSize:13, letterSpacing:'0.12em', fontStyle:'italic', opacity:0.85 }}>
+              {weddingDateText}
+            </p>
+            {venueName && (
+              <p style={{ color:'#9B7A5A', fontSize:11, letterSpacing:'0.1em', marginTop:4, opacity:0.65 }}>
+                {venueName}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── CTA button ── */}
+        <div className="cta-btn" style={{
+          position:'relative', zIndex:10,
+          width:'100%', maxWidth:320, padding:'0 28px',
+          marginTop:24,
+        }}>
+          <button
+            onClick={handlePlay}
+            className="tap-hint"
+            style={{
+              display:'block', width:'100%', padding:'17px 0',
+              background:'linear-gradient(135deg, #2D6A4F, #1B3A2D)',
+              border:'1px solid rgba(200,169,110,0.45)',
+              borderRadius:50, cursor:'pointer',
+              fontFamily:"'Playfair Display', serif",
+              color:'#F5F8F2', fontSize:15, fontStyle:'italic',
+              letterSpacing:'0.12em',
+              boxShadow:'0 8px 36px rgba(29,58,45,0.28)',
+            }}
+          >
+            Open Our Invitation
+          </button>
+          <p style={{
+            textAlign:'center', color:'#7A9E7E', fontSize:9,
+            letterSpacing:'0.35em', textTransform:'uppercase',
+            marginTop:10, opacity:0.7,
+          }}>tap to reveal</p>
+        </div>
+
+        {/* ── Floating hearts after open ── */}
+        {playing && animDone && (
+          <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:20 }}>
+            {Array.from({ length: 8 }).map((_,i) => (
+              <span key={i} style={{
+                position:'absolute',
+                left: `${15 + i * 10}%`,
+                top: '60%',
+                fontSize: 10 + (i % 3) * 6,
+                color: i % 2 ? '#2D6A4F' : '#C8A96E',
+                animation: `heartFloat ${1 + i * 0.15}s ease-out ${i * 0.1}s both`,
+              }}>♥</span>
+            ))}
+          </div>
+        )}
+
+        {/* bottom space */}
+        <div style={{ height:32 }} />
+      </div>
+    </>
+  )
+
+  if (slide === 'story') return (
+    <>
+      <video id="wedding-music" src="/assests/video/video1.mp4" loop={false} playsInline
+        style={{ position:'fixed', width:1, height:1, opacity:0, pointerEvents:'none' }} />
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet" />
+
+      <div style={{ minHeight:'100vh', background: OL_DEEP, position:'relative' }}>
+
+        {/* sticky header */}
+        <div style={{
+          position:'sticky', top:0, zIndex:50,
+          background:`${OL_DEEP}ee`, backdropFilter:'blur(16px)',
+          borderBottom:`1px solid ${OL}44`,
+          padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between',
+        }}>
+          <div>
+            <p style={{ color: GOLD, fontSize:8, letterSpacing:'0.4em', textTransform:'uppercase', margin:0, opacity:0.7 }}>Our Story</p>
+            {(boyName || girlName) && (
+              <p style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:16, fontStyle:'italic', margin:'2px 0 0', opacity:0.9 }}>
+                {boyName}{boyName && girlName ? ' & ' : ''}{girlName}
+              </p>
+            )}
           </div>
           <button
-            type="button"
-            onClick={handleConfirmAccept}
-            disabled={submitting}
-            className="w-full py-3 font-medium rounded-full text-sm disabled:opacity-50 shadow-md"
-            style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})`, color: '#fff' }}
-          >
-            {submitting ? 'Submitting...' : 'Confirm Attendance'}
-          </button>
+            onClick={() => setSlide('details')}
+            style={{
+              padding:'8px 18px', borderRadius:50,
+              background:`linear-gradient(135deg, ${OL}, ${OL_DARK})`,
+              color: CREAM, border:`1px solid ${GOLD}44`,
+              fontSize:10, letterSpacing:'0.2em', textTransform:'uppercase',
+              cursor:'pointer', fontWeight:600,
+            }}
+          >Details →</button>
         </div>
-      ) : (
-        <>
-          <p className="text-sm mb-1 mt-2" style={{ color: DARK }}>Your presence would mean so much to us.</p>
-          <p className="text-xs mb-4 opacity-70" style={{ color: DARK }}>Kindly let us know if you will be joining our celebration.</p>
-          <div className="flex gap-3 justify-center">
-            <button
-              type="button"
-              onClick={handleAccept}
-              disabled={submitting}
-              className="px-8 py-3.5 rounded-2xl text-white font-bold text-sm shadow-xl disabled:opacity-50"
-              style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})` }}
-            >
-              Joyfully Accept
-            </button>
-            <button
-              type="button"
-              onClick={handleDeclineClick}
-              disabled={submitting}
-              className="px-8 py-3.5 rounded-2xl text-sm font-medium border disabled:opacity-50"
-              style={{ borderColor: PINK, color: PINK_DEEP, background: 'rgba(255,255,255,0.6)' }}
-            >
-              Regretfully Decline
-            </button>
+
+        {/* photos scroll section */}
+        <div style={{ padding:'0 20px 32px' }}>
+
+          {/* full-width hero photo */}
+          {togetherPhoto ? (
+            <div style={{
+              borderRadius:0, overflow:'hidden',
+              height:'62vw', maxHeight:320, position:'relative',
+              marginLeft:'-20px', marginRight:'-20px', width:'calc(100% + 40px)',
+            }}>
+              <img src={togetherPhoto} alt="Together"
+                style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 20%', filter:'brightness(0.9) saturate(1.1)' }} />
+              <div style={{ position:'absolute', inset:0, background:`linear-gradient(to top, ${OL_DEEP} 0%, transparent 50%)` }} />
+              <div style={{ position:'absolute', bottom:20, left:20, right:20 }}>
+                {(boyName || girlName) && (
+                  <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:32, fontWeight:400, fontStyle:'italic', margin:0, lineHeight:1.15, textShadow:`0 2px 12px rgba(0,0,0,0.5)` }}>
+                    {boyName}{boyName && girlName ? <span style={{ color: GOLD }}> &amp; </span> : ''}{girlName}
+                  </h1>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* no photo — just names big */
+            <div style={{
+              background:`linear-gradient(135deg, ${OL_DARK}, ${OL_DEEP})`,
+              padding:'60px 20px', textAlign:'center',
+              margin:'0 -20px', borderBottom:`1px solid ${OL}44`,
+            }}>
+              {boyName && <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:40, fontStyle:'italic', margin:0 }}>{boyName}</h1>}
+              <p style={{ color: GOLD, fontSize:24, fontStyle:'italic', fontFamily:"'Playfair Display', serif", margin:'8px 0' }}>&amp;</p>
+              {girlName && <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:40, fontStyle:'italic', margin:0 }}>{girlName}</h1>}
+            </div>
+          )}
+
+          {/* quote block */}
+          <div style={{ padding:'32px 4px 24px', textAlign:'center' }}>
+            <div style={{ width:40, height:1, background:GOLD, margin:'0 auto 20px', opacity:0.4 }} />
+            <p style={{
+              color:`${CREAM}cc`, fontSize:16,
+              fontFamily:"'Playfair Display', serif", fontStyle:'italic',
+              lineHeight:1.75, margin:0,
+            }}>
+              "Unexpectedly met, deeply in love,<br />and ready to begin our forever."
+            </p>
+            <div style={{ width:40, height:1, background:GOLD, margin:'20px auto 0', opacity:0.4 }} />
           </div>
-        </>
-      )}
-    </div>
+
+          {/* additional photos grid — 2 cols */}
+          {storyPhotos.length > 1 && (
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
+              {storyPhotos.slice(1, 5).map((src, i) => (
+                <div key={i} style={{
+                  borderRadius:16, overflow:'hidden',
+                  aspectRatio:'3/4',
+                  border:`1px solid ${OL}55`,
+                }}>
+                  <img src={src} alt={`Photo ${i+2}`}
+                    style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%' }} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* date teaser */}
+          {weddingDateText && (
+            <div style={{
+              background: `linear-gradient(135deg, ${OL_DARK}cc, ${OL_DEEP}cc)`,
+              backdropFilter:'blur(12px)',
+              borderRadius:20, padding:'22px',
+              border:`1px solid ${GOLD}33`,
+              textAlign:'center', marginBottom:24,
+            }}>
+              <p style={{ color: GOLD, fontSize:9, letterSpacing:'0.4em', textTransform:'uppercase', margin:'0 0 8px', opacity:0.8 }}>Save the Date</p>
+              <p style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:18, fontStyle:'italic', margin:0 }}>
+                {weddingDateText}
+              </p>
+            </div>
+          )}
+
+          {/* scroll-to-details button */}
+          <button
+            onClick={() => setSlide('details')}
+            style={{
+              width:'100%', padding:'16px', borderRadius:50,
+              background:`linear-gradient(135deg, ${OL}, ${OL_DARK})`,
+              color: CREAM, border:`1px solid ${GOLD}55`,
+              fontSize:12, letterSpacing:'0.25em', textTransform:'uppercase',
+              fontWeight:600, cursor:'pointer',
+              boxShadow:`0 6px 24px ${OL}66`,
+            }}
+          >View Wedding Details →</button>
+        </div>
+      </div>
+    </>
   )
 
-  const storyBackgroundPhoto = togetherPhoto || '/assests/images/couple2.jpeg'
-
+  // ══════════════════════════════════════════════════════════════════════════
+  //  DETAILS SLIDE
+  // ══════════════════════════════════════════════════════════════════════════
   return (
     <>
-      {/* Persistent music element - rendered exactly once, never unmounted across slide changes. */}
-      <video
-        id="wedding-music-player"
-        src="/assests/video/video1.mp4"
-        loop={false}
-        style={{ position: 'fixed', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
-        playsInline
-      />
+      <video id="wedding-music" src="/assests/video/video1.mp4" loop={false} playsInline
+        style={{ position:'fixed', width:1, height:1, opacity:0, pointerEvents:'none' }} />
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet" />
 
-      {/* ===================== SLIDE: COVER ===================== */}
-      {slide === 'cover' && (
-        <div className="min-h-screen relative flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(160deg, ${CREAM} 0%, #FCE4EC 60%, #F8D7E0 100%)` }}>
-          <Petals />
-          <div className="relative z-10 text-center px-6 animate-[fadeIn_1.2s_ease-out]">
-            <div className="mb-6 rounded-2xl py-3 px-5 shadow-lg" style={{ background: '#fff' }}>
-              <p className="text-sm font-serif" style={{ color: PINK_DEEP }}>Dear {guestName},</p>
-              <p className="text-xs mt-1" style={{ color: GOLD }}>We warmly invite you to share in the celebration of our wedding day.</p>
+      {/* fixed bg */}
+      <div style={{ position:'fixed', inset:0, zIndex:0 }}>
+        {togetherPhoto
+          ? <img src={togetherPhoto} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:'brightness(0.25) saturate(0.6)' }} />
+          : <div style={{ width:'100%', height:'100%', background:`linear-gradient(170deg, ${OL_DEEP}, #0e130a)` }} />
+        }
+        <div style={{ position:'absolute', inset:0, background:`linear-gradient(to bottom, ${OL_DEEP}bb, ${OL_DEEP}f5)` }} />
+      </div>
+
+      {/* sticky nav */}
+      <div style={{
+        position:'sticky', top:0, zIndex:50,
+        background:`${OL_DEEP}ee`, backdropFilter:'blur(16px)',
+        borderBottom:`1px solid ${OL}44`,
+        padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between',
+      }}>
+        <button onClick={() => setSlide('story')} style={{ background:'none', border:'none', color:`${CREAM}88`, fontSize:11, cursor:'pointer', letterSpacing:'0.1em' }}>
+          ← Our Story
+        </button>
+        {(boyName || girlName) && (
+          <p style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:14, fontStyle:'italic', margin:0, opacity:0.85 }}>
+            {boyName}{boyName && girlName ? ' & ' : ''}{girlName}
+          </p>
+        )}
+        <div style={{ width:60 }} />
+      </div>
+
+      <div style={{ position:'relative', zIndex:10, maxWidth:440, margin:'0 auto', padding:'32px 20px 60px' }}>
+
+        {/* couple photo circle */}
+        {togetherPhoto && (
+          <div style={{ textAlign:'center', marginBottom:28, animation:'fadeUp 0.7s ease-out both' }}>
+            <div style={{
+              width:120, height:120, borderRadius:'50%', overflow:'hidden',
+              margin:'0 auto', padding:3,
+              background:`linear-gradient(135deg, ${GOLD}, ${OL})`,
+              boxShadow:`0 8px 32px rgba(0,0,0,0.4)`,
+            }}>
+              <div style={{ width:'100%', height:'100%', borderRadius:'50%', overflow:'hidden', border:`3px solid ${OL_DEEP}` }}>
+                <img src={togetherPhoto} alt="Couple" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              </div>
             </div>
-            <div className="text-xl mb-5" style={{ color: PINK_DEEP }}>{'\u2740 \u2740 \u2740'}</div>
-            <p className="text-xs tracking-[0.3em] uppercase mb-4" style={{ color: GOLD }}>The Wedding Of</p>
-            <h1 className="text-4xl mb-1 italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>{boyName}</h1>
-            <p className="text-xl italic my-1" style={{ color: PINK, fontFamily: "'Playfair Display', serif" }}>&amp;</p>
-            <h1 className="text-4xl mb-10 italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>{girlName}</h1>
-
-            <button onClick={handlePlay} className="group relative w-20 h-20 mx-auto mb-4 flex items-center justify-center" aria-label="Play invitation">
-              <span className="absolute inset-0 rounded-full animate-ping" style={{ background: 'rgba(224,114,138,0.4)' }}></span>
-              <span className="relative w-20 h-20 rounded-full flex items-center justify-center text-2xl shadow-xl transition-transform group-active:scale-95" style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})`, color: '#fff' }}>
-                {'\u25B6'}
-              </span>
-            </button>
-            <p className="text-xs tracking-widest uppercase" style={{ color: PINK_DEEP }}>Tap to Open Our Invitation</p>
           </div>
-          <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+        )}
+
+        {/* names block */}
+        <div style={{ textAlign:'center', marginBottom:28, animation:'fadeUp 0.7s ease-out 0.1s both' }}>
+          {boyName && <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:38, fontWeight:400, fontStyle:'italic', margin:0, lineHeight:1.1 }}>{boyName}</h1>}
+          <p style={{ color: GOLD, fontSize:20, fontStyle:'italic', margin:'6px 0', fontFamily:"'Playfair Display', serif" }}>&amp;</p>
+          {girlName && <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:38, fontWeight:400, fontStyle:'italic', margin:'0 0 12px', lineHeight:1.1 }}>{girlName}</h1>}
+          <p style={{ color:`${CREAM}66`, fontSize:12, lineHeight:1.6 }}>
+            Together with their families,<br />request the pleasure of your company.
+          </p>
         </div>
-      )}
 
-      {/* ===================== SLIDE: SAVE THE DATE CALENDAR ===================== */}
-      {slide === 'calendar' && (
-        <div className="min-h-screen relative flex items-center justify-center overflow-hidden px-6" style={{ background: `linear-gradient(160deg, ${CREAM} 0%, #FCE4EC 60%, #F8D7E0 100%)` }}>
-          <Petals />
-          <div className={`relative z-10 text-center max-w-sm w-full transition-all duration-1000 ${calendarRevealed ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-            <p className="text-xs tracking-[0.4em] uppercase mb-1" style={{ color: GOLD }}>Save the date</p>
-            <h1 className="text-3xl italic mb-1" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>{boyName} &amp; {girlName}</h1>
-            <p className="text-xs tracking-[0.3em] uppercase mb-6" style={{ color: GOLD, opacity: 0.85 }}>{monthName}</p>
+        {/* parents */}
+        {(boyFather || boyMother || girlFather || girlMother) && (
+          <Card delay="0.2s">
+            {(boyFather || boyMother) && (
+              <div style={{ marginBottom: girlFather || girlMother ? 14 : 0 }}>
+                <Label>Beloved Son of</Label>
+                {boyFather && <Detail>{boyFather}</Detail>}
+                {boyFather && boyMother && <div style={{ color: GOLD, fontSize:11, margin:'2px 0' }}>&amp;</div>}
+                {boyMother && <Detail>{boyMother}</Detail>}
+              </div>
+            )}
+            {(boyFather || boyMother) && (girlFather || girlMother) && <Divider />}
+            {(girlFather || girlMother) && (
+              <div>
+                <Label>Beloved Daughter of</Label>
+                {girlFather && <Detail>{girlFather}</Detail>}
+                {girlFather && girlMother && <div style={{ color: GOLD, fontSize:11, margin:'2px 0' }}>&amp;</div>}
+                {girlMother && <Detail>{girlMother}</Detail>}
+              </div>
+            )}
+          </Card>
+        )}
 
-            <div className="rounded-2xl p-4 shadow-lg" style={{ background: '#fff', border: `1px solid ${PINK}50` }}>
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                  <div key={i} className="text-[10px] font-medium" style={{ color: GOLD, opacity: 0.85 }}>{d}</div>
+        {/* countdown */}
+        <Card delay="0.3s">
+          <Label>Until We Say "I Do"</Label>
+          <div style={{ display:'flex', justifyContent:'center', gap:10, marginTop:14 }}>
+            {[
+              { label:'Days',  value: countdown.days },
+              { label:'Hrs',   value: countdown.hours },
+              { label:'Min',   value: countdown.minutes },
+              { label:'Sec',   value: countdown.seconds },
+            ].map(item => (
+              <div key={item.label} style={{
+                background:`linear-gradient(160deg, ${OL}, ${OL_DARK})`,
+                borderRadius:16, width:66, paddingTop:14, paddingBottom:14,
+                textAlign:'center', border:`1px solid ${GOLD}33`,
+                boxShadow:`0 4px 16px rgba(0,0,0,0.3)`,
+              }}>
+                <span style={{ display:'block', fontSize:24, fontWeight:700, color: CREAM, fontFamily:"'Playfair Display', serif" }}>{item.value}</span>
+                <span style={{ display:'block', fontSize:8, letterSpacing:'0.1em', textTransform:'uppercase', color: GOLD, opacity:0.85 }}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* calendar + date */}
+        {wDate && (
+          <Card delay="0.35s">
+            <Label>Save the Date</Label>
+            {weddingDateText && <Detail style={{ fontSize:15, marginBottom:16 }}>{weddingDateText}</Detail>}
+            {/* mini calendar */}
+            <div style={{ background:`${OL_DEEP}88`, borderRadius:14, padding:'16px', border:`1px solid ${OL}44` }}>
+              <p style={{ color: GOLD, fontSize:10, letterSpacing:'0.3em', textTransform:'uppercase', marginBottom:10, textAlign:'center', opacity:0.8 }}>{monthName}</p>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3, marginBottom:6 }}>
+                {['S','M','T','W','T','F','S'].map((d,i) => (
+                  <div key={i} style={{ color: GOLD, fontSize:9, fontWeight:600, textAlign:'center', opacity:0.7 }}>{d}</div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1">
-                {calendarCells.map((day, i) => (
-                  <div key={i} className="aspect-square flex items-center justify-center text-xs">
-                    {day ? (
-                      day === weddingDay ? (
-                        <span className="w-full h-full rounded-full flex items-center justify-center font-medium" style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})`, color: '#fff' }}>
-                          {'\u2665'}
-                        </span>
-                      ) : (
-                        <span style={{ color: DARK, opacity: 0.8 }}>{day}</span>
-                      )
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3 }}>
+                {calCells.map((day,i) => (
+                  <div key={i} style={{ aspectRatio:'1', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {day === weddingDay ? (
+                      <span style={{
+                        width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center',
+                        background:`linear-gradient(135deg, ${OL}, ${OL_DARK})`,
+                        color: GOLD, fontSize:10, fontWeight:700, borderRadius:'50%',
+                        border:`1px solid ${GOLD}55`,
+                      }}>♥</span>
+                    ) : day ? (
+                      <span style={{ color:`${CREAM}60`, fontSize:10 }}>{day}</span>
                     ) : null}
                   </div>
                 ))}
               </div>
             </div>
+          </Card>
+        )}
 
-            <p className="italic text-sm mt-6" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>We look forward to celebrating this special day with you</p>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== SLIDE: STORY ===================== */}
-      {slide === 'story' && (
-        <div className="min-h-screen relative flex items-center justify-center overflow-hidden px-6">
-          <div className="absolute inset-0 z-0">
-            <img
-              src={storyBackgroundPhoto}
-              alt="Background"
-              className="w-full h-full object-cover"
-              style={{ filter: 'brightness(0.65)', objectPosition: 'center 25%' }}
-            />
-            <div className="absolute inset-0 bg-black/30"></div>
-          </div>
-
-          <div className={`relative z-10 text-center max-w-sm w-full transition-all duration-1000 ${storyRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <p className="text-[10px] tracking-[0.3em] uppercase mb-2 font-bold" style={{ color: '#ffd700' }}>OUR STORY</p>
-
-            <div className="rounded-3xl p-8 border border-white/20 bg-white/10 backdrop-blur-md shadow-2xl">
-              <p className="text-lg italic text-white leading-relaxed mb-6" style={{ fontFamily: "'Playfair Display', serif" }}>
-                "Unexpectedly met, deeply in love, and ready to begin our forever."
-              </p>
-
-              <div className="w-16 h-[1px] bg-white/50 mx-auto mb-6"></div>
-
-              <h1 className="text-3xl font-light tracking-wide" style={{ color: '#fff', fontFamily: "'Playfair Display', serif" }}>
-                {boyName} <span className="text-white/60">&</span> {girlName}
-              </h1>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== SLIDE: DETAILS ===================== */}
-      {slide === 'details' && (
-        <div className="min-h-screen relative overflow-hidden" style={{ fontFamily: "'Playfair Display', serif" }}>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-          <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet" />
-
-          {togetherPhoto ? (
-            <div className="fixed inset-0 z-0">
-              <img src={togetherPhoto} alt="Background" className="w-full h-full object-cover" />
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(251,243,238,0.55), rgba(251,243,238,0.92))', backdropFilter: 'blur(2px)' }}></div>
-            </div>
-          ) : (
-            <div className="fixed inset-0 z-0">
-              <img src="/assests/images/couple2.jpeg" alt="Background" className="w-full h-full object-cover" />
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(251,243,238,0.6), rgba(251,243,238,0.93))', backdropFilter: 'blur(2px)' }}></div>
-            </div>
-          )}
-
-          <div className="relative z-10 max-w-md mx-auto px-6 py-16 text-center">
-
-            <div className="flex justify-center mb-3 animate-[fadeUp_0.8s_ease-out]">
-              <div className="relative p-1 rounded-full shadow-xl" style={{ background: `linear-gradient(135deg, ${GOLD}, ${PINK})` }}>
-                <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white relative">
-                  {togetherPhoto ? (
-                    <img src={togetherPhoto} alt="Couple" className="w-full h-full object-cover" />
-                  ) : (
-                    <img src="/assests/images/couple1.jpeg" alt="Couple" className="w-full h-full object-cover" />
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-8 animate-[fadeUp_0.8s_ease-out_0.1s_both]">
-              <h1 className="text-5xl mb-1 leading-tight italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>
-                {boyName}
-              </h1>
-              <p className="text-2xl italic my-1" style={{ color: PINK, fontFamily: "'Playfair Display', serif" }}>&amp;</p>
-              <h1 className="text-5xl mb-2 leading-tight italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>
-                {girlName}
-              </h1>
-              <p className="text-sm mb-1 mt-4" style={{ color: DARK, opacity: 0.8 }}>Together with their families,</p>
-              <p className="text-sm" style={{ color: DARK, opacity: 0.8 }}>request the pleasure of your company</p>
-              <p className="text-sm" style={{ color: DARK, opacity: 0.8 }}>as they celebrate their marriage.</p>
-            </div>
-
-            {/* Card: Parents */}
-            <div className="grid grid-cols-1 gap-4 mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.2s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
-              <div>
-                <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Beloved Son of</p>
-                <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{boyFather}</p>
-                <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>&</p>
-                <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{boyMother}</p>
-              </div>
-              <div className="text-lg italic" style={{ color: PINK }}>&</div>
-              <div>
-                <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Beloved Daughter of</p>
-                <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{girlFather}</p>
-                <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>&</p>
-                <p className="text-sm italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{girlMother}</p>
-              </div>
-            </div>
-
-            {/* Card: Countdown */}
-            <div className="mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.3s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
-              <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Until We Say "I Do"</p>
-              <p className="text-[10px] mb-4 opacity-70" style={{ color: DARK }}>Countdown to Our Special Day</p>
-              <div className="flex justify-center gap-3">
-                {[
-                  { label: 'Days', value: countdown.days },
-                  { label: 'Hrs', value: countdown.hours },
-                  { label: 'Min', value: countdown.minutes },
-                  { label: 'Sec', value: countdown.seconds },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-2xl w-16 py-4 shadow-lg" style={{ background: `linear-gradient(160deg, ${PINK}, ${PINK_DEEP})` }}>
-                    <span className="block text-xl text-white" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>{item.value}</span>
-                    <span className="block text-[8px] uppercase tracking-widest text-white opacity-80">{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Card: Date & Schedule */}
-            <div className="space-y-5 mb-6 p-6 rounded-3xl shadow-xl animate-[fadeUp_0.8s_ease-out_0.4s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Wedding Day</p>
-                <p className="text-lg italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{weddingDateText}</p>
-              </div>
-
-              <div className="h-px" style={{ background: `${PINK}30` }}></div>
-
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] mb-3" style={{ color: GOLD }}>Schedule</p>
-                <div className="space-y-2">
-                  {ceremonyTime && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span style={{ color: PINK_DEEP }}>{'\u{1F48D}'} Poruwa Ceremony</span>
-                      <span style={{ color: DARK }}>{formatTime(ceremonyTime)}</span>
-                    </div>
-                  )}
-                  {receptionTime && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span style={{ color: PINK_DEEP }}>{'\u{1F942}'} Reception ends</span>
-                      <span style={{ color: DARK }}>{formatTime(receptionTime)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Card: Venue with embedded map */}
-            <div className="mb-6 rounded-3xl shadow-xl overflow-hidden animate-[fadeUp_0.8s_ease-out_0.45s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.6)' }}>
-              {mapUrl && getMapEmbedUrl(mapUrl) ? (
-                <div className="w-full h-44">
-                  <iframe
-                    src={getMapEmbedUrl(mapUrl)}
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0 }}
-                    loading="lazy"
-                    title="Venue location"
-                  ></iframe>
-                </div>
-              ) : null}
-              <div className="p-6 text-left">
-                <p className="text-[10px] uppercase tracking-[0.2em] mb-1" style={{ color: GOLD }}>Venue</p>
-                <p className="text-lg italic" style={{ color: DARK, fontFamily: "'Playfair Display', serif" }}>{venueName}</p>
-                <p className="text-xs opacity-80" style={{ color: DARK }}>{venueAddress}</p>
-                {mapUrl && (
-                  <button
-                    onClick={() => window.open(mapUrl, '_blank')}
-                    className="inline-block mt-3 text-xs px-4 py-2 rounded-full shadow-md"
-                    style={{ background: `linear-gradient(135deg, ${PINK}, ${PINK_DEEP})`, color: '#fff' }}
-                  >
-                    Open in Google Maps
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {notes && (
-              <div className="rounded-3xl p-5 mb-6 shadow-lg animate-[fadeUp_0.8s_ease-out_0.5s_both]" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)' }}>
-                <p className="text-[10px] uppercase tracking-[0.2em] mb-2" style={{ color: GOLD }}>Note</p>
-                <p className="text-sm" style={{ color: DARK }}>{notes}</p>
+        {/* schedule */}
+        {(ceremonyTime || receptionTime) && (
+          <Card delay="0.4s">
+            <Label>Schedule</Label>
+            {ceremonyTime && (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <span style={{ color:`${CREAM}99`, fontSize:13, fontStyle:'italic', fontFamily:"'Playfair Display', serif" }}>💍 Poruwa Ceremony</span>
+                <span style={{ color: CREAM, fontSize:13, fontWeight:600 }}>{fmt12(ceremonyTime)}</span>
               </div>
             )}
+            {ceremonyTime && receptionTime && <Divider />}
+            {receptionTime && (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ color:`${CREAM}99`, fontSize:13, fontStyle:'italic', fontFamily:"'Playfair Display', serif" }}>🥂 Reception</span>
+                <span style={{ color: CREAM, fontSize:13, fontWeight:600 }}>{fmt12(receptionTime)}</span>
+              </div>
+            )}
+          </Card>
+        )}
 
-            <RsvpSection />
-            <DeclineConfirmModal />
-
-            <div className="mt-8">
-              <p className="text-xs italic opacity-70" style={{ color: DARK }}>Thank you for being part of our journey.</p>
-              <p className="text-sm italic mt-3" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>With Love,</p>
-              <p className="text-lg italic" style={{ color: PINK_DEEP, fontFamily: "'Playfair Display', serif" }}>{boyName} &amp; {girlName}</p>
-              <p className="text-xs mt-3" style={{ color: GOLD }}>{'\u2764'} Forever Begins Here {'\u2764'}</p>
+        {/* venue */}
+        {(venueName || venueAddress) && (
+          <div style={{
+            borderRadius:20, overflow:'hidden', marginBottom:14,
+            border:`1px solid ${OL}55`,
+            animation:'fadeUp 0.7s ease-out 0.45s both',
+          }}>
+            {mapUrl && getMapEmbed(mapUrl) && (
+              <div style={{ width:'100%', height:160 }}>
+                <iframe src={getMapEmbed(mapUrl)} width="100%" height="100%" style={{ border:0 }} loading="lazy" title="Venue" />
+              </div>
+            )}
+            <div style={{ background:`rgba(44,51,24,0.92)`, backdropFilter:'blur(12px)', padding:'20px 22px' }}>
+              <Label>Venue</Label>
+              {venueName    && <Detail style={{ fontSize:15, margin:'6px 0 4px' }}>{venueName}</Detail>}
+              {venueAddress && <p style={{ color:`${CREAM}70`, fontSize:12, margin:'0 0 14px' }}>{venueAddress}</p>}
+              {mapUrl && (
+                <button
+                  onClick={() => window.open(mapUrl, '_blank')}
+                  style={{
+                    background:`linear-gradient(135deg, ${OL}, ${OL_DARK})`,
+                    color: CREAM, border:`1px solid ${GOLD}44`, borderRadius:50,
+                    padding:'8px 20px', fontSize:11, cursor:'pointer', letterSpacing:'0.1em',
+                  }}
+                >📍 Open in Google Maps</button>
+              )}
             </div>
-
-            <button onClick={handleReplay} className="mt-6 text-[10px] underline opacity-60" style={{ color: PINK_DEEP }}>
-              Replay invitation
-            </button>
           </div>
+        )}
 
-          <style>{`
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-          `}</style>
+        {/* notes */}
+        {notes && (
+          <Card delay="0.5s">
+            <Label>Note</Label>
+            <p style={{ color:`${CREAM}bb`, fontSize:13, lineHeight:1.65, margin:'8px 0 0' }}>{notes}</p>
+          </Card>
+        )}
+
+        {/* ── RSVP ───────────────────────────────────────────────────────────── */}
+        <div style={{ animation:'fadeUp 0.7s ease-out 0.55s both' }}>
+          <div style={{
+            background:'rgba(44,51,24,0.85)', backdropFilter:'blur(16px)',
+            borderRadius:24, padding:'24px',
+            border:`1px solid ${GOLD}33`,
+            boxShadow:`0 8px 32px rgba(0,0,0,0.3)`,
+          }}>
+            {guestName && (
+              <p style={{ color:`${CREAM}cc`, fontSize:13, marginBottom:12, fontStyle:'italic', fontFamily:"'Playfair Display', serif" }}>
+                Dear <strong style={{ color: CREAM }}>{guestName}</strong>,
+              </p>
+            )}
+            {responded ? (
+              <div style={{
+                borderRadius:16, padding:'16px',
+                background: rsvpStatus === 'confirmed' ? 'rgba(76,175,80,0.12)' : 'rgba(220,80,80,0.12)',
+                border:`1px solid ${rsvpStatus === 'confirmed' ? 'rgba(76,175,80,0.3)' : 'rgba(220,80,80,0.3)'}`,
+              }}>
+                {rsvpStatus === 'confirmed' ? (
+                  <>
+                    <p style={{ color:'#7ec97f', fontSize:14, fontWeight:600, margin:'0 0 4px' }}>✓ You're confirmed!</p>
+                    <p style={{ color:'#7ec97f', fontSize:12, opacity:0.8, margin:0 }}>We can't wait to celebrate with you{guestName ? `, ${guestName}` : ''}!</p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ color:'#e07070', fontSize:14, fontWeight:600, margin:'0 0 4px' }}>Thanks for letting us know</p>
+                    <p style={{ color:'#e07070', fontSize:12, opacity:0.8, margin:0 }}>We'll miss you{guestName ? `, ${guestName}` : ''}. Sending our love! 💚</p>
+                  </>
+                )}
+              </div>
+            ) : showPicker ? (
+              <div>
+                {/* guest count picker — prominent */}
+                <p style={{ color: GOLD, fontSize:10, letterSpacing:'0.3em', textTransform:'uppercase', textAlign:'center', marginBottom:6, opacity:0.9 }}>
+                  How many guests will attend?
+                </p>
+                <p style={{ color:`${CREAM}77`, fontSize:11, textAlign:'center', marginBottom:18, fontStyle:'italic' }}>
+                  Including yourself
+                </p>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:0, marginBottom:6 }}>
+                  <button
+                    onClick={() => setGuestCount(Math.max(1, guestCount-1))}
+                    style={{
+                      width:46, height:46, borderRadius:'50%',
+                      border:`1.5px solid ${GOLD}66`, color: GOLD, fontSize:24,
+                      background:'rgba(255,255,255,0.06)', cursor:'pointer',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                    }}
+                  >−</button>
+                  <div style={{ minWidth:80, textAlign:'center' }}>
+                    <span style={{ fontSize:42, fontWeight:400, color: CREAM, fontFamily:"'Playfair Display', serif", lineHeight:1 }}>{guestCount}</span>
+                  </div>
+                  <button
+                    onClick={() => setGuestCount(Math.min(10, guestCount+1))}
+                    style={{
+                      width:46, height:46, borderRadius:'50%',
+                      border:`1.5px solid ${GOLD}66`, color: GOLD, fontSize:24,
+                      background:'rgba(255,255,255,0.06)', cursor:'pointer',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                    }}
+                  >+</button>
+                </div>
+                <p style={{ color:`${CREAM}55`, fontSize:10, textAlign:'center', marginBottom:20, letterSpacing:'0.1em' }}>
+                  {guestCount === 1 ? 'Just me' : `${guestCount} guests`}
+                </p>
+                <button
+                  onClick={async () => {
+                    setSubmitting(true)
+                    const res = await submitRsvpAction(token, 'confirmed', guestCount)
+                    setSubmitting(false)
+                    if (res.success) { setResponded(true); setRsvpStatus('confirmed'); setShowPicker(false) }
+                  }}
+                  disabled={submitting}
+                  style={{
+                    width:'100%', padding:'15px', borderRadius:50,
+                    border:`1px solid ${GOLD}44`,
+                    background:`linear-gradient(135deg, #2D6A4F, #1B3A2D)`,
+                    color: CREAM, fontSize:13, fontWeight:600, cursor:'pointer',
+                    letterSpacing:'0.12em',
+                    opacity: submitting ? 0.6 : 1,
+                    boxShadow:`0 6px 24px rgba(29,58,45,0.4)`,
+                  }}
+                >{submitting ? 'Submitting...' : 'Confirm Attendance ✓'}</button>
+                <button
+                  onClick={() => setShowPicker(false)}
+                  style={{ width:'100%', padding:'10px', background:'transparent', border:'none', color:`${CREAM}44`, fontSize:11, cursor:'pointer', marginTop:8, letterSpacing:'0.1em' }}
+                >← Back</button>
+              </div>
+            ) : (
+              <>
+                <p style={{ color:`${CREAM}88`, fontSize:13, marginBottom:4 }}>Your presence would mean the world to us.</p>
+                <p style={{ color:`${CREAM}55`, fontSize:11, marginBottom:18 }}>Kindly let us know if you will be joining our celebration.</p>
+                <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
+                  <button
+                    onClick={() => setShowPicker(true)}
+                    style={{
+                      padding:'13px 28px', borderRadius:50, border:`1px solid ${GOLD}55`,
+                      background:`linear-gradient(135deg, #2D6A4F, #1B3A2D)`,
+                      color: CREAM, fontSize:12, fontWeight:600, cursor:'pointer',
+                      boxShadow:`0 4px 18px rgba(29,58,45,0.35)`, letterSpacing:'0.05em',
+                    }}
+                  >🎉 Joyfully Accept</button>
+                  <button
+                    onClick={() => setShowDecline(true)}
+                    style={{
+                      padding:'13px 28px', borderRadius:50,
+                      border:`1px solid ${OL}88`, background:'rgba(255,255,255,0.05)',
+                      color:`${CREAM}99`, fontSize:12, cursor:'pointer',
+                    }}
+                  >Regretfully Decline</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* footer */}
+        <div style={{ textAlign:'center', marginTop:36 }}>
+          <div style={{ width:80, height:1, background:`linear-gradient(to right, transparent, ${GOLD}55, transparent)`, margin:'0 auto 16px' }} />
+          <p style={{ color:`${CREAM}55`, fontSize:11, fontStyle:'italic' }}>Thank you for being part of our journey.</p>
+          <p style={{ color: GOLD, fontSize:13, fontFamily:"'Playfair Display', serif", fontStyle:'italic', margin:'6px 0' }}>With love,</p>
+          {(boyName || girlName) && (
+            <p style={{ color: CREAM, fontSize:17, fontFamily:"'Playfair Display', serif", fontStyle:'italic', margin:0 }}>
+              {boyName}{boyName && girlName ? ' & ' : ''}{girlName}
+            </p>
+          )}
+          <p style={{ color:`${OL}cc`, fontSize:18, marginTop:10 }}>🌿</p>
+        </div>
+
+        <button onClick={() => setSlide('cover')} style={{ display:'block', margin:'24px auto 0', background:'none', border:'none', color:`${CREAM}33`, fontSize:10, textDecoration:'underline', cursor:'pointer' }}>
+          Replay invitation
+        </button>
+      </div>
+
+      {/* decline modal */}
+      {showDecline && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:100,
+          background:'rgba(20,26,10,0.75)', backdropFilter:'blur(8px)',
+          display:'flex', alignItems:'center', justifyContent:'center', padding:24,
+        }}>
+          <div style={{
+            background: OL_DARK, borderRadius:28, padding:'32px 28px',
+            maxWidth:340, width:'100%', textAlign:'center',
+            border:`1px solid ${GOLD}44`,
+            boxShadow:'0 24px 64px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ fontSize:36, marginBottom:12 }}>🌿</div>
+            <h2 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:20, fontStyle:'italic', marginBottom:8 }}>
+              We'd love to have you
+            </h2>
+            <p style={{ color:`${CREAM}77`, fontSize:13, marginBottom:24 }}>
+              Are you sure? We will truly miss you on our special day.
+            </p>
+            <div style={{ display:'flex', gap:10 }}>
+              <button
+                onClick={() => setShowDecline(false)}
+                style={{ flex:1, padding:'13px', borderRadius:50, border:`1px solid ${OL}88`, color:`${CREAM}99`, background:'transparent', fontSize:13, cursor:'pointer' }}
+              >Go Back</button>
+              <button
+                onClick={async () => {
+                  setShowDecline(false); setSubmitting(true)
+                  const res = await submitRsvpAction(token, 'declined', 0)
+                  setSubmitting(false)
+                  if (res.success) { setResponded(true); setRsvpStatus('declined') }
+                }}
+                style={{ flex:1, padding:'13px', borderRadius:50, border:`1px solid ${GOLD}44`,
+                  background:`linear-gradient(135deg, ${OL}, ${OL_DARK})`,
+                  color: CREAM, fontSize:13, cursor:'pointer' }}
+              >Yes, Decline</button>
+            </div>
+          </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+      `}</style>
     </>
   )
+}
+
+// ── Small reusable layout helpers (defined outside component so no re-render) ──
+const OL_C  = '#5C6B2E'
+const GOLD_C = '#C8A96E'
+const CREAM_C = '#F5F0E6'
+const OL_DARK_C = '#3A4520'
+const OL_DEEP_C = '#2C3318'
+
+function Card({ children, delay = '0s' }: { children: React.ReactNode, delay?: string }) {
+  return (
+    <div style={{
+      background:'rgba(44,51,24,0.85)', backdropFilter:'blur(16px)',
+      borderRadius:20, padding:'20px 22px', marginBottom:14,
+      border:`1px solid ${OL_C}55`,
+      boxShadow:'0 6px 24px rgba(0,0,0,0.25)',
+      animation:`fadeUp 0.7s ease-out ${delay} both`,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ color: GOLD_C, fontSize:9, letterSpacing:'0.35em', textTransform:'uppercase', margin:'0 0 4px', opacity:0.8 }}>
+      {children}
+    </p>
+  )
+}
+
+function Detail({ children, style = {} }: { children: React.ReactNode, style?: React.CSSProperties }) {
+  return (
+    <p style={{ color: CREAM_C, fontSize:14, fontStyle:'italic', fontFamily:"'Playfair Display', serif", margin:'2px 0', ...style }}>
+      {children}
+    </p>
+  )
+}
+
+function Divider() {
+  return <div style={{ height:1, background:`${OL_C}44`, margin:'14px 0' }} />
 }
