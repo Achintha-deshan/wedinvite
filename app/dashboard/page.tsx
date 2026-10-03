@@ -108,7 +108,9 @@ export default function DashboardPage() {
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const confirmedCount = guests.filter(g => g.rsvp_status === 'confirmed').length
+  const confirmedGuests = guests.filter(g => g.rsvp_status === 'confirmed')
+  const confirmedCount = confirmedGuests.length
+  const totalAttending = confirmedGuests.reduce((sum, g) => sum + (g.guest_count || 1), 0)
   const pendingCount = guests.filter(g => g.rsvp_status === 'pending').length
   const declinedCount = guests.filter(g => g.rsvp_status === 'declined').length
 
@@ -177,7 +179,8 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        {/* Stats — 5 cards on sm+, 2+3 on mobile */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
           <div className="bg-white rounded-2xl p-4 border border-rose-50 shadow-sm">
             <div className="text-2xl mb-2">👥</div>
             <div className="text-2xl font-bold text-gray-800">{guests.length}</div>
@@ -187,6 +190,11 @@ export default function DashboardPage() {
             <div className="text-2xl mb-2">✅</div>
             <div className="text-2xl font-bold text-green-600">{confirmedCount}</div>
             <div className="text-xs text-gray-400 mt-1">Confirmed</div>
+          </div>
+          <div className="bg-white rounded-2xl p-4 border border-green-50 shadow-sm border-l-2 border-l-green-400">
+            <div className="text-2xl mb-2">🎉</div>
+            <div className="text-2xl font-bold text-green-700">{totalAttending}</div>
+            <div className="text-xs text-gray-400 mt-1">Total Attending</div>
           </div>
           <div className="bg-white rounded-2xl p-4 border border-rose-50 shadow-sm">
             <div className="text-2xl mb-2">⏳</div>
@@ -287,6 +295,11 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {statusBadge(guest.rsvp_status)}
+                      {guest.rsvp_status === 'confirmed' && (guest.guest_count || 1) > 0 && (
+                        <span className="text-[10px] px-2 py-1 rounded-full bg-green-50 text-green-700 font-medium">
+                          👤 {guest.guest_count || 1} {(guest.guest_count || 1) === 1 ? 'person' : 'people'}
+                        </span>
+                      )}
                       <button
                         onClick={() => handleCopyLink(guest)}
                         title="Copy invitation link"
