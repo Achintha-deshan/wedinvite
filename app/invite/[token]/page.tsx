@@ -119,7 +119,7 @@ export default function GuestInvitePage() {
   const venueName     = couple?.venue_name     || ''
   const venueAddress  = couple?.venue_address  || ''
   const mapUrl        = couple?.map_url        || ''
-const togetherPhoto = couple?.together_photo_url || '/assests/images/together.jpeg'
+  const togetherPhoto = couple?.together_photo_url || ''
   const storyPhoto    = couple?.story_photo_url    || togetherPhoto
   const boyPhoto      = couple?.boy_photo_url      || ''
   const girlPhoto     = couple?.girl_photo_url     || ''
@@ -416,25 +416,75 @@ const togetherPhoto = couple?.together_photo_url || '/assests/images/together.jp
     </>
   )
 
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STORY SLIDE — Responsive, modern, cinematic layout
+  // ══════════════════════════════════════════════════════════════════════════
   if (slide === 'story') return (
     <>
       <video id="wedding-music" src="/assests/video/video1.mp4" loop={false} playsInline
         style={{ position:'fixed', width:1, height:1, opacity:0, pointerEvents:'none' }} />
-      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet" />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet" />
 
-      <div style={{ minHeight:'100vh', background: OL_DEEP, position:'relative' }}>
+      <style>{`
+        @keyframes storyFadeIn {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes kenBurns {
+          0%   { transform: scale(1.08); }
+          100% { transform: scale(1); }
+        }
+        @keyframes goldLineDraw {
+          from { width: 0; opacity: 0; }
+          to   { width: 60px; opacity: 0.6; }
+        }
+        @keyframes captionRise {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes photoReveal {
+          from { opacity: 0; transform: scale(0.96); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        .story-hero-img   { animation: kenBurns 8s ease-out both; }
+        .story-caption    { animation: captionRise 0.8s ease-out 0.3s both; }
+        .story-photo-card { animation: photoReveal 0.7s ease-out 0.5s both; }
+        .story-grid-boy   { animation: photoReveal 0.7s ease-out 0.65s both; }
+        .story-grid-girl  { animation: photoReveal 0.7s ease-out 0.8s both; }
+        .story-cta        { animation: storyFadeIn 0.8s ease-out 1s both; }
+        .story-quote      { animation: storyFadeIn 0.8s ease-out 0.4s both; }
+        .story-gold-line  { animation: goldLineDraw 1s ease-out 0.6s both; }
+        @media (prefers-reduced-motion: reduce) {
+          .story-hero-img, .story-caption, .story-photo-card,
+          .story-grid-boy, .story-grid-girl, .story-cta, .story-quote {
+            animation: none !important;
+          }
+        }
+      `}</style>
 
-        {/* sticky header */}
+      <div style={{
+        minHeight: '100dvh',
+        background: OL_DEEP,
+        fontFamily: "'Cormorant Garamond', serif",
+        overflowX: 'hidden',
+      }}>
+
+        {/* ── Sticky header ── */}
         <div style={{
-          position:'sticky', top:0, zIndex:50,
-          background:`${OL_DEEP}ee`, backdropFilter:'blur(16px)',
-          borderBottom:`1px solid ${OL}44`,
-          padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between',
+          position: 'sticky', top: 0, zIndex: 50,
+          background: `${OL_DEEP}f0`,
+          backdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${OL}33`,
+          padding: '12px 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <p style={{ color: GOLD, fontSize:8, letterSpacing:'0.4em', textTransform:'uppercase', margin:0, opacity:0.7 }}>Our Story</p>
+            <p style={{ color: GOLD, fontSize: 8, letterSpacing: '0.45em', textTransform: 'uppercase', margin: 0, opacity: 0.7 }}>Our Story</p>
             {(boyName || girlName) && (
-              <p style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:16, fontStyle:'italic', margin:'2px 0 0', opacity:0.9 }}>
+              <p style={{ color: CREAM, fontFamily: "'Playfair Display', serif", fontSize: 15, fontStyle: 'italic', margin: '2px 0 0', opacity: 0.88 }}>
                 {boyName}{boyName && girlName ? ' & ' : ''}{girlName}
               </p>
             )}
@@ -442,110 +492,286 @@ const togetherPhoto = couple?.together_photo_url || '/assests/images/together.jp
           <button
             onClick={() => setSlide('details')}
             style={{
-              padding:'8px 18px', borderRadius:50,
-              background:`linear-gradient(135deg, ${OL}, ${OL_DARK})`,
-              color: CREAM, border:`1px solid ${GOLD}44`,
-              fontSize:10, letterSpacing:'0.2em', textTransform:'uppercase',
-              cursor:'pointer', fontWeight:600,
+              padding: '8px 20px', borderRadius: 50,
+              background: `linear-gradient(135deg, ${OL}, ${OL_DARK})`,
+              color: CREAM, border: `1px solid ${GOLD}44`,
+              fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase',
+              cursor: 'pointer', fontWeight: 600,
             }}
           >Details →</button>
         </div>
 
-        {/* photos scroll section */}
-        <div style={{ padding:'0 20px 32px' }}>
+        {/* ── HERO — togetherPhoto, full-bleed, tall ── */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          height: 'min(90vw, 520px)',
+          overflow: 'hidden',
+          background: OL_DARK,
+        }}>
+          {togetherPhoto && (
+            <img
+              src={togetherPhoto}
+              alt={`${boyName} & ${girlName}`}
+              className="story-hero-img"
+              style={{
+                width: '100%', height: '100%',
+                objectFit: 'cover', objectPosition: 'center 20%',
+                display: 'block',
+              }}
+            />
+          )}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: `linear-gradient(to bottom, transparent 40%, ${OL_DEEP} 100%)`,
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, transparent 30%)',
+          }} />
+        </div>
 
-          {/* full-width hero photo */}
-          {togetherPhoto ? (
-            <div style={{
-              borderRadius:0, overflow:'hidden',
-              height:'62vw', maxHeight:320, position:'relative',
-              marginLeft:'-20px', marginRight:'-20px', width:'calc(100% + 40px)',
+        {/* ── Caption block — names + date ── */}
+        <div className="story-caption" style={{
+          textAlign: 'center',
+          padding: '0 24px 32px',
+          marginTop: -8,
+          position: 'relative', zIndex: 2,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 20 }}>
+            <div className="story-gold-line" style={{
+              height: 1,
+              background: `linear-gradient(to right, transparent, ${GOLD})`,
+              flexShrink: 0,
+            }} />
+            <span style={{ color: GOLD, fontSize: 14, opacity: 0.7, flexShrink: 0 }}>✦</span>
+            <div className="story-gold-line" style={{
+              height: 1,
+              background: `linear-gradient(to left, transparent, ${GOLD})`,
+              flexShrink: 0,
+            }} />
+          </div>
+
+          {(boyName || girlName) && (
+            <h1 style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: 'clamp(30px, 8vw, 48px)',
+              fontWeight: 400, fontStyle: 'italic',
+              color: CREAM,
+              lineHeight: 1.2,
+              margin: '0 0 6px',
             }}>
-              <img src={togetherPhoto} alt="Together"
-                style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 20%', filter:'brightness(0.9) saturate(1.1)' }} />
-              <div style={{ position:'absolute', inset:0, background:`linear-gradient(to top, ${OL_DEEP} 0%, transparent 50%)` }} />
-              <div style={{ position:'absolute', bottom:20, left:20, right:20 }}>
-                {(boyName || girlName) && (
-                  <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:32, fontWeight:400, fontStyle:'italic', margin:0, lineHeight:1.15, textShadow:`0 2px 12px rgba(0,0,0,0.5)` }}>
-                    {boyName}{boyName && girlName ? <span style={{ color: GOLD }}> &amp; </span> : ''}{girlName}
-                  </h1>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* no photo — just names big */
-            <div style={{
-              background:`linear-gradient(135deg, ${OL_DARK}, ${OL_DEEP})`,
-              padding:'60px 20px', textAlign:'center',
-              margin:'0 -20px', borderBottom:`1px solid ${OL}44`,
-            }}>
-              {boyName && <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:40, fontStyle:'italic', margin:0 }}>{boyName}</h1>}
-              <p style={{ color: GOLD, fontSize:24, fontStyle:'italic', fontFamily:"'Playfair Display', serif", margin:'8px 0' }}>&amp;</p>
-              {girlName && <h1 style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:40, fontStyle:'italic', margin:0 }}>{girlName}</h1>}
-            </div>
+              {boyName}
+              {boyName && girlName && (
+                <span style={{ color: GOLD, fontStyle: 'normal', margin: '0 12px', fontSize: '0.7em', verticalAlign: 'middle', opacity: 0.9 }}>&amp;</span>
+              )}
+              {girlName}
+            </h1>
           )}
 
-          {/* quote block */}
-          <div style={{ padding:'32px 4px 24px', textAlign:'center' }}>
-            <div style={{ width:40, height:1, background:GOLD, margin:'0 auto 20px', opacity:0.4 }} />
+          {weddingDateText && (
             <p style={{
-              color:`${CREAM}cc`, fontSize:16,
-              fontFamily:"'Playfair Display', serif", fontStyle:'italic',
-              lineHeight:1.75, margin:0,
+              color: `${CREAM}99`,
+              fontSize: 'clamp(11px, 3vw, 14px)',
+              letterSpacing: '0.08em',
+              fontStyle: 'italic',
+              margin: '8px 0 0',
+              lineHeight: 1.5,
+            }}>
+              {weddingDateText}
+            </p>
+          )}
+
+          <div className="story-quote" style={{ marginTop: 24, padding: '0 8px' }}>
+            <p style={{
+              color: `${CREAM}bb`,
+              fontSize: 'clamp(14px, 4vw, 17px)',
+              fontFamily: "'Playfair Display', serif",
+              fontStyle: 'italic',
+              lineHeight: 1.8,
+              margin: 0,
             }}>
               "Unexpectedly met, deeply in love,<br />and ready to begin our forever."
             </p>
-            <div style={{ width:40, height:1, background:GOLD, margin:'20px auto 0', opacity:0.4 }} />
           </div>
+        </div>
 
-          {/* additional photos grid — 2 cols */}
-          {storyPhotos.length > 1 && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
-              {storyPhotos.slice(1, 5).map((src, i) => (
-                <div key={i} style={{
-                  borderRadius:16, overflow:'hidden',
-                  aspectRatio:'3/4',
-                  border:`1px solid ${OL}55`,
-                }}>
-                  <img src={src} alt={`Photo ${i+2}`}
-                    style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 15%' }} />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* date teaser */}
-          {weddingDateText && (
+        {/* ── storyPhoto — wide cinematic card ── */}
+        {storyPhoto && storyPhoto !== togetherPhoto && (
+          <div className="story-photo-card" style={{
+            margin: '0 16px 20px',
+            borderRadius: 20,
+            overflow: 'hidden',
+            position: 'relative',
+            background: OL_DARK,
+            boxShadow: `0 12px 40px rgba(0,0,0,0.45)`,
+            border: `1px solid ${OL}44`,
+          }}>
             <div style={{
-              background: `linear-gradient(135deg, ${OL_DARK}cc, ${OL_DEEP}cc)`,
-              backdropFilter:'blur(12px)',
-              borderRadius:20, padding:'22px',
-              border:`1px solid ${GOLD}33`,
-              textAlign:'center', marginBottom:24,
+              width: '100%',
+              height: 'min(70vw, 380px)',
+              overflow: 'hidden',
             }}>
-              <p style={{ color: GOLD, fontSize:9, letterSpacing:'0.4em', textTransform:'uppercase', margin:'0 0 8px', opacity:0.8 }}>Save the Date</p>
-              <p style={{ color: CREAM, fontFamily:"'Playfair Display', serif", fontSize:18, fontStyle:'italic', margin:0 }}>
-                {weddingDateText}
+              <img
+                src={storyPhoto}
+                alt="Together"
+                style={{
+                  width: '100%', height: '100%',
+                  objectFit: 'cover', objectPosition: 'center 25%',
+                  display: 'block',
+                }}
+              />
+            </div>
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              background: `linear-gradient(to top, ${OL_DEEP}ee 0%, transparent 100%)`,
+              padding: '32px 20px 16px',
+            }}>
+              <p style={{
+                color: CREAM, fontSize: 12, letterSpacing: '0.15em',
+                fontStyle: 'italic', opacity: 0.85, margin: 0,
+                fontFamily: "'Cormorant Garamond', serif",
+              }}>
+                Our Story
               </p>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* scroll-to-details button */}
+        {/* ── Boy | Girl — 50/50 portrait grid ── */}
+        {(boyPhoto || girlPhoto) && (
+          <div style={{
+            margin: '0 16px 28px',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 12,
+          }}>
+            <div className="story-grid-boy" style={{
+              borderRadius: 18, overflow: 'hidden',
+              position: 'relative',
+              background: OL_DARK,
+              border: `1px solid ${OL}44`,
+              boxShadow: `0 8px 28px rgba(0,0,0,0.35)`,
+            }}>
+              <div style={{ width: '100%', aspectRatio: '3/4', overflow: 'hidden' }}>
+                {boyPhoto ? (
+                  <img
+                    src={boyPhoto}
+                    alt={boyName || 'Groom'}
+                    style={{
+                      width: '100%', height: '100%',
+                      objectFit: 'cover', objectPosition: 'center 10%',
+                      display: 'block',
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%', height: '100%',
+                    background: `linear-gradient(135deg, ${OL_DARK}, ${OL_DEEP})`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: 36, opacity: 0.3 }}>👤</span>
+                  </div>
+                )}
+              </div>
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                background: `linear-gradient(to top, ${OL_DEEP}f0 0%, transparent 100%)`,
+                padding: '28px 12px 12px',
+                textAlign: 'center',
+              }}>
+                <p style={{
+                  color: GOLD, fontSize: 8, letterSpacing: '0.35em',
+                  textTransform: 'uppercase', margin: '0 0 3px', opacity: 0.85,
+                }}>Groom</p>
+                {boyName && (
+                  <p style={{
+                    color: CREAM, fontSize: 'clamp(13px, 3.5vw, 16px)',
+                    fontFamily: "'Playfair Display', serif", fontStyle: 'italic',
+                    margin: 0, lineHeight: 1.2,
+                  }}>{boyName}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="story-grid-girl" style={{
+              borderRadius: 18, overflow: 'hidden',
+              position: 'relative',
+              background: OL_DARK,
+              border: `1px solid ${OL}44`,
+              boxShadow: `0 8px 28px rgba(0,0,0,0.35)`,
+            }}>
+              <div style={{ width: '100%', aspectRatio: '3/4', overflow: 'hidden' }}>
+                {girlPhoto ? (
+                  <img
+                    src={girlPhoto}
+                    alt={girlName || 'Bride'}
+                    style={{
+                      width: '100%', height: '100%',
+                      objectFit: 'cover', objectPosition: 'center 10%',
+                      display: 'block',
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%', height: '100%',
+                    background: `linear-gradient(135deg, ${OL_DARK}, ${OL_DEEP})`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: 36, opacity: 0.3 }}>👤</span>
+                  </div>
+                )}
+              </div>
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                background: `linear-gradient(to top, ${OL_DEEP}f0 0%, transparent 100%)`,
+                padding: '28px 12px 12px',
+                textAlign: 'center',
+              }}>
+                <p style={{
+                  color: GOLD, fontSize: 8, letterSpacing: '0.35em',
+                  textTransform: 'uppercase', margin: '0 0 3px', opacity: 0.85,
+                }}>Bride</p>
+                {girlName && (
+                  <p style={{
+                    color: CREAM, fontSize: 'clamp(13px, 3.5vw, 16px)',
+                    fontFamily: "'Playfair Display', serif", fontStyle: 'italic',
+                    margin: 0, lineHeight: 1.2,
+                  }}>{girlName}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── View Details CTA ── */}
+        <div className="story-cta" style={{ padding: '0 20px 48px' }}>
+          <div style={{
+            width: 80, height: 1,
+            background: `linear-gradient(to right, transparent, ${GOLD}66, transparent)`,
+            margin: '0 auto 28px',
+          }} />
           <button
             onClick={() => setSlide('details')}
             style={{
-              width:'100%', padding:'16px', borderRadius:50,
-              background:`linear-gradient(135deg, ${OL}, ${OL_DARK})`,
-              color: CREAM, border:`1px solid ${GOLD}55`,
-              fontSize:12, letterSpacing:'0.25em', textTransform:'uppercase',
-              fontWeight:600, cursor:'pointer',
-              boxShadow:`0 6px 24px ${OL}66`,
+              display: 'block', width: '100%',
+              padding: '16px',
+              borderRadius: 50,
+              background: `linear-gradient(135deg, ${OL}, ${OL_DARK})`,
+              color: CREAM,
+              border: `1px solid ${GOLD}55`,
+              fontSize: 'clamp(11px, 3vw, 13px)',
+              letterSpacing: '0.25em',
+              textTransform: 'uppercase',
+              fontWeight: 600, cursor: 'pointer',
+              boxShadow: `0 6px 24px ${OL}66`,
             }}
           >View Wedding Details →</button>
         </div>
       </div>
     </>
   )
+
 
   // ══════════════════════════════════════════════════════════════════════════
   //  DETAILS SLIDE
