@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { getInvitationByTokenAction, submitRsvpAction } from '../../actions/guests'
 
-// ── Sage/Emerald/Gold palette (customer requirement) ──────────────────────────
+// ── Sage/Emerald/Gold palette (customer requirement)
 const OL       = '#7A9E7E'   // sage green — mid tone
 const OL_DARK  = '#2D6A4F'   // emerald green — deep
 const OL_DEEP  = '#1B3A2D'   // forest dark — bg
@@ -272,18 +272,44 @@ export default function GuestInvitePage() {
         ))}
 
         {/* ── Top ornament ── */}
+        {/* ── Top ornament ── */}
         <div style={{ position:'relative', zIndex:10, textAlign:'center', paddingTop:52, width:'100%' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:6 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:8 }}>
             <div style={{ width:48, height:1, background:'linear-gradient(to right,transparent,#C8A96E)', opacity:0.5 }} className="shimmer-line" />
             <span style={{ color:'#C8A96E', fontSize:11, letterSpacing:'0.4em', opacity:0.75 }}>✦</span>
             <div style={{ width:48, height:1, background:'linear-gradient(to left,transparent,#C8A96E)', opacity:0.5 }} className="shimmer-line" />
           </div>
+
+          {/* 🌟 Highlighted Guest Name */}
           {guestName && (
-            <p style={{ color:'#9B7A5A', fontSize:13, fontStyle:'italic', letterSpacing:'0.04em', marginBottom:2, opacity:0.9 }}>
-              Dear {guestName},
-            </p>
+            <div style={{ marginBottom: 8, padding: '0 16px' }}>
+              <p style={{ 
+                color: '#C8A96E', 
+                fontSize: 12, 
+                letterSpacing: '0.25em', 
+                textTransform: 'uppercase', 
+                marginBottom: 4, 
+                opacity: 0.85,
+                fontFamily: "'Cormorant Garamond', serif"
+              }}>
+                Dear
+              </p>
+              <h2 style={{ 
+                color: '#2C2218', 
+                fontFamily: "'Playfair Display', serif", 
+                fontSize: 'clamp(24px, 7vw, 34px)', 
+                fontWeight: 700, 
+                fontStyle: 'italic',
+                textShadow: '0 2px 10px rgba(200,169,110,0.3)',
+                letterSpacing: '0.02em',
+                lineHeight: 1.2
+              }}>
+                {guestName}
+              </h2>
+            </div>
           )}
-          <p style={{ color:'#C8A96E', fontSize:9, letterSpacing:'0.5em', textTransform:'uppercase', opacity:0.65 }}>
+
+          <p style={{ color:'#7A9E7E', fontSize:10, letterSpacing:'0.4em', textTransform:'uppercase', opacity:0.8, marginTop: 12 }}>
             You are warmly invited to the wedding of
           </p>
         </div>

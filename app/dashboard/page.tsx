@@ -285,41 +285,66 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {currentGuests.map((guest) => (
-                  <div key={guest.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{guest.name}</p>
-                      {guest.phone_or_email && (
-                        <p className="text-xs text-gray-400 truncate">{guest.phone_or_email}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {statusBadge(guest.rsvp_status)}
-                      {guest.rsvp_status === 'confirmed' && (guest.guest_count || 1) > 0 && (
-                        <span className="text-[10px] px-2 py-1 rounded-full bg-green-50 text-green-700 font-medium">
-                          👤 {guest.guest_count || 1} {(guest.guest_count || 1) === 1 ? 'person' : 'people'}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleCopyLink(guest)}
-                        title="Copy invitation link"
-                        className={`text-xs px-3 py-1.5 rounded-lg transition-all ${
-                          copiedId === guest.id
-                            ? 'bg-green-100 text-green-600'
-                            : 'bg-rose-100 text-rose-500 hover:bg-rose-200'
-                        }`}
-                      >
-                        {copiedId === guest.id ? '✓ Copied' : '🔗 Copy URL'}
-                      </button>
-                      <button
-                        onClick={() => handleDeleteGuest(guest.id)}
-                        className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                <div className="space-y-3">
+  {currentGuests.map((guest) => (
+    <div
+      key={guest.id}
+      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-gray-50/90 hover:bg-gray-50 rounded-2xl border border-gray-100 transition-all"
+    >
+      {/* 1. Guest Name & Contact Info (Mobile වලදී Full Width) */}
+      <div className="w-full sm:flex-1 sm:min-w-0">
+        <p className="text-sm font-semibold text-gray-800 break-words leading-snug">
+          {guest.name}
+        </p>
+        {guest.phone_or_email && (
+          <p className="text-xs text-gray-400 truncate mt-0.5">
+            {guest.phone_or_email}
+          </p>
+        )}
+      </div>
+
+      {/* 2. Badges & Action Buttons (Mobile වලදී යට පේළියේ දෙපැත්තට බෙදෙනවා) */}
+      <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-2.5 sm:pt-0 border-t border-gray-200/60 sm:border-t-0 flex-shrink-0">
+        
+        {/* Status & Guest Count Badges */}
+        <div className="flex items-center flex-wrap gap-1.5">
+          {statusBadge(guest.rsvp_status)}
+          
+          {guest.rsvp_status === 'confirmed' && (guest.guest_count || 1) > 0 && (
+            <span className="text-[10px] px-2 py-1 rounded-full bg-green-50 text-green-700 font-medium border border-green-200/70 whitespace-nowrap">
+              👤 {guest.guest_count || 1}{' '}
+              {(guest.guest_count || 1) === 1 ? 'person' : 'people'}
+            </span>
+          )}
+        </div>
+
+        {/* Copy & Delete Buttons */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={() => handleCopyLink(guest)}
+            title="Copy invitation link"
+            className={`text-xs px-3 py-1.5 rounded-xl font-medium transition-all whitespace-nowrap ${
+              copiedId === guest.id
+                ? 'bg-green-100 text-green-600'
+                : 'bg-rose-100 text-rose-500 hover:bg-rose-200'
+            }`}
+          >
+            {copiedId === guest.id ? '✓ Copied' : '🔗 Copy URL'}
+          </button>
+          
+          <button
+            onClick={() => handleDeleteGuest(guest.id)}
+            title="Remove guest"
+            className="text-xs px-2.5 py-1.5 rounded-xl bg-white border border-gray-200/80 text-gray-400 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all"
+          >
+            🗑️
+          </button>
+        </div>
+
+      </div>
+    </div>
+  ))}
+</div>
               </div>
             )}
           </div>
